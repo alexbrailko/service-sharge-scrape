@@ -1,0 +1,24 @@
+{
+  "name": "service-charge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "heroku-postbuild": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^4.2.1",
+    "cheerio": "^1.0.0-rc.12",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.34",
+    "node-cron": "^3.0.2",
+    "puppeteer": "^15.5.0"
+  },
+  "devDependencies": {
+    "prisma": "^4.2.1"
+  }
+}

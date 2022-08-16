@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>HTML 5 Boilerplate</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+<picture>
+  <source srcset="https://lid.zoocdn.com/u/480/360/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 480w, https://lid.zoocdn.com/u/768/576/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 768w, https://lid.zoocdn.com/u/1024/768/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 1024w, https://lid.zoocdn.com/u/1080/810/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 1080w, https://lid.zoocdn.com/u/1200/900/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 1200w, https://lid.zoocdn.com/u/1600/1200/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 1600w, https://lid.zoocdn.com/u/2400/1800/a554a829b1d8512d234c63d4a615850d7019b938.jpg:p 2400w" type="image/webp" sizes="(min-width: 1280px) 800px, (min-width: 960px) 66vw, 100vw">
+  <img src="https://lid.zoocdn.com/u/2400/1800/a554a829b1d8512d234c63d4a615850d7019b938.jpg" role="img" alt="Property photo 8 of 8. " draggable="false">
+</picture>
+ 
+
+<script>
+  const listingsData = [
+  {
+    url: 'https://www.zoopla.co.uk/for-sale/details/62082075/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+    beds: '2',
+    baths: '2',
+    datePosted: '2022-07-31T00:00:00.000Z',
+    listingPrice: '235,000',
+    title: '2 bed flat for saleEdge Street, Aylesbury HP19',
+    address: 'Edge Street, Aylesbury HP19',
+    serviceCharge: '190,012',
+    groundRent: '325',
+    pictures: []
+  },
+  {
+    url: 'https://www.zoopla.co.uk/for-sale/details/62082078/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+    beds: '2',
+    baths: '1',
+    datePosted: '2022-07-31T00:00:00.000Z',
+    listingPrice: '290,000',
+    title: '2 bed flat for saleBengeo Gardens, Romford, Essex RM6',
+    address: 'Bengeo Gardens, Romford, Essex RM6',
+    serviceCharge: '1,532',
+    groundRent: '170',
+    pictures: []
+  },
+  {
+    url: 'https://www.zoopla.co.uk/for-sale/details/62082073/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+    beds: '1',
+    baths: '1',
+    datePosted: '2022-07-31T00:00:00.000Z',
+    listingPrice: '325,000',
+    title: '1 bed flat for saleSomers Road, Reigate, Surrey RH2',
+    address: 'Somers Road, Reigate, Surrey RH2',
+    serviceCharge: '600',
+    groundRent: null,
+    pictures: []
+  },
+  {
+    url: 'https://www.zoopla.co.uk/for-sale/details/62082075/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+    beds: '2',
+    baths: '2',
+    datePosted: '2022-07-31T00:00:00.000Z',
+    listingPrice: '235,000',
+    title: '2 bed flat for saleEdge Street, Aylesbury HP19',
+    address: 'Edge Street, Aylesbury HP19',
+    serviceCharge: '190,012',
+    groundRent: '325',
+    pictures: []
+  },
+  ];
+
+  // let newListingsData = [
+  // {
+  //   url: 'https://www.zoopla.co.uk/for-sale/details/62082075/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+  //   beds: '2',
+  //   baths: '2',
+  //   datePosted: '2022-07-31T00:00:00.000Z',
+  //   listingPrice: '235,000',
+  //   title: '2 bed flat for saleEdge Street, Aylesbury HP19',
+  //   address: 'Edge Street, Aylesbury HP19',
+  //   serviceCharge: '190,012',
+  //   groundRent: '325',
+  //   pictures: []
+  // },
+  // {
+  //   url: 'https://www.zoopla.co.uk/for-sale/details/62082318/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+  //   beds: '2',
+  //   baths: '1',
+  //   datePosted: '2022-07-31T00:00:00.000Z',
+  //   listingPrice: '192,000',
+  //   title: '2 bed flat for saleBengeo Gardens, Romford, Essex RM6',
+  //   address: 'Bengeo Gardens, Romford, Essex RM6',
+  //   serviceCharge: '1,532',
+  //   groundRent: '170',
+  //   pictures: []
+  // },
+  // {
+  //   url: 'https://www.zoopla.co.uk/for-sale/details/62082323/?search_identifier=3f9bd345d58dedeaa059da1778e98bf4',
+  //   beds: '2',
+  //   baths: '2',
+  //   datePosted: '2022-07-31T00:00:00.000Z',
+  //   listingPrice: '373,500',
+  //   title: '2 bed flat for saleBolnore Road, Haywards Heath, West Sussex RH16',
+  //   address: 'Bolnore Road, Haywards Heath, West Sussex RH16',
+  //   serviceCharge: '2,300',
+  //   groundRent: '750',
+  //   pictures: []
+  // },
+  // ];
+
+const a = listingsData.filter((value, index, self) =>
+  index === self.findIndex((t) => (
+    t.address === value.address && t.listingPrice === value.listingPrice
+  ))
+)
+
+const b = listingsData.filter((v,i,a)=>a.findIndex(v2=>['address','listingPrice'].every(k=>v2[k] ===v[k]))===i);
+console.log('a', b);
+</script>
+
+</body>
+</html>
