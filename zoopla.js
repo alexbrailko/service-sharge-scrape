@@ -7,7 +7,7 @@ const helpers = require('./helpers.js');
 const Prisma = require('@prisma/client');
 
 const BASE_URL = 'https://www.zoopla.co.uk';
-const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/property/london/?page_size=25&price_min=0&price_max=100000&q=London&radius=40&results_sort=newest_listings&search_source=refine&pn=1';
+const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/property/london/?page_size=25&q=London&radius=40&results_sort=newest_listings&search_source=refine&property_sub_type=flats&price_min=300000&price_max=400000&pn=4';
 
 let browser = null;
 let page = null;
@@ -97,6 +97,7 @@ const zoopla = {
       newUrl = helpers.updateURLParameter(newUrl, 'price_max', incrementPrice(priceMax, index));
      // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
+      newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
     }
   },
 
@@ -158,8 +159,8 @@ const zoopla = {
         console.log('finishScraping');
         if (listingsData.length) {
           await this.saveToDb(listingsData);
-          finishScraping = false;
         }
+        finishScraping = false;
         break;
       }
 
@@ -215,7 +216,7 @@ const zoopla = {
         const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
 
         // for first scrape
-        olderThanXDays = moment(datePosted).diff(latestPostDate, "days") < -4;
+        olderThanXDays = moment(datePosted).diff(latestPostDate, "days") < -5;
 
         if (olderThanXDays) {
           //console.log('olderThanXDays');
@@ -246,7 +247,7 @@ const zoopla = {
     if (finishScraping) {
       if (olderThanXDays) {
         return listings.filter(
-          (listing) => moment(listing.datePosted).diff(latestPostDate, "days") >= -4,
+          (listing) => moment(listing.datePosted).diff(latestPostDate, "days") >= -5,
         );
       }
       return listings.filter(
@@ -267,8 +268,17 @@ const zoopla = {
     }
 
     for (var i = 0; i < listings.length; i++) {
-      await Promise.all([page.waitForNavigation(), page.goto(listings[i].url)]);
-      const html = await page.content();
+      let html;
+
+      try {
+        await Promise.all([page.waitForNavigation(), page.goto(listings[i].url)]);
+        html = await page.content();
+      } catch(e) {
+        console.log('scrapeListings for loop upper', e);
+        await page.waitForTimeout(120000);
+        await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+      }
+
       const $ = cheerio.load(html);
       await page.waitForTimeout(1000);
 

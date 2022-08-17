@@ -4,11 +4,11 @@ const cron = require('node-cron');
 // const cheerio = require('cheerio');
 // const Prisma = require("@prisma/client");
 
-//(async () => {
-  // await zoopla.initialize();
-  // await zoopla.agreeOnTerms();
-  // await zoopla.preparePages();
-  // await zoopla.close();
+(async () => {
+  await zoopla.initialize();
+  await zoopla.agreeOnTerms();
+  await zoopla.preparePages();
+  await zoopla.close();
 
   // const prisma = new Prisma.PrismaClient();
   // const data = await prisma.listing.findMany({
@@ -47,7 +47,7 @@ const cron = require('node-cron');
   // const res2 = await zoopla.findGroundRent($, page);
   // console.log('res2', res2);
   // await browser.close();
-//})();
+})();
 
 // cron.schedule('0 0 */3 * *', async function() {
 //   await zoopla.initialize();
@@ -55,6 +55,6 @@ const cron = require('node-cron');
 //   await zoopla.preparePages();
 //   await zoopla.close();
 // });
-cron.schedule('* * * * *', () => {
-  console.log('running a task every minute');
-});
+// cron.schedule('* * * * *', () => {
+//   console.log('running a task every minute');
+// });
