@@ -49,12 +49,14 @@ const cron = require('node-cron');
   // await browser.close();
 //})();
 
-// cron.schedule('0 0 */3 * *', async function() {
-//   await zoopla.initialize();
-//   await zoopla.agreeOnTerms();
-//   await zoopla.preparePages();
-//   await zoopla.close();
-// });
+cron.schedule('0 0 */3 * *', async function() {
+  await zoopla.initialize();
+  await zoopla.agreeOnTerms();
+  await zoopla.preparePages();
+  await zoopla.close();
+  var date = new Date();
+  console.log('FINISHED AT', date.toGMTString());
+});
 // cron.schedule('* * * * *', () => {
 //   console.log('running a task every minute');
 // });

@@ -7,12 +7,13 @@ const helpers = require('./helpers.js');
 const Prisma = require('@prisma/client');
 
 const BASE_URL = 'https://www.zoopla.co.uk';
-const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/property/london/?page_size=25&q=London&radius=40&results_sort=newest_listings&search_source=refine&property_sub_type=flats&price_min=300000&price_max=400000&pn=4';
+const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/property/london/?page_size=25&q=London&radius=40&results_sort=newest_listings&search_source=refine&property_sub_type=flats&price_min=0&price_max=100000&pn=1';
 
 let browser = null;
 let page = null;
 let prisma = null;
 let finishScraping = false;
+let latestPostDate = null;
 
 const zoopla = {
   initialize: async () => {
@@ -69,7 +70,7 @@ const zoopla = {
       await frame.click('button#saveAndExit');
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
-      this.preparePages();
+      zoopla.preparePages();
     }
   },
 
@@ -130,10 +131,12 @@ const zoopla = {
       const search_params = url.searchParams;
       // get url parameters
       const pn = parseInt(search_params.get('pn'));
+      const priceMin = parseInt(search_params.get('price_min'));
+      const priceMax = parseInt(search_params.get('price_max'));
       const newUrl = helpers.updateURLParameter(mainUrl, 'pn', pn + 1);
       mainUrl = newUrl;
 
-      const listingsList = await this.scrapeListingsList();
+      const listingsList = await this.scrapeListingsList(priceMin, priceMax);
 
       const listings = await this.scrapeListings(listingsList);
       console.log('listingsLength', listings?.length);
@@ -150,7 +153,7 @@ const zoopla = {
             ) === i,
         );
         await this.saveToDb(listingsData);
-        console.log('saved to db');
+        
         // console.log('listings', listingsData);
         listingsData = [];
       }
@@ -161,6 +164,7 @@ const zoopla = {
           await this.saveToDb(listingsData);
         }
         finishScraping = false;
+        latestPostDate = null;
         break;
       }
 
@@ -181,18 +185,38 @@ const zoopla = {
     }
   },
 
-  scrapeListingsList: async function () {
+  scrapeListingsList: async function (priceMin, priceMax) {
     const html = await page.content();
     const $ = cheerio.load(html);
-    let olderThanXDays = false;
+    let scrapeFirstTime = false;
 
-    const latestPost = await prisma.listing.findMany({
-      take: 1,
-      orderBy: {
-        datePosted: 'desc',
-      },
-    });
-    const latestPostDate = latestPost.length ? latestPost[0].datePosted : null;
+    if (!latestPostDate) {
+      const latestPost = await prisma.listing.findMany({
+        where: {
+          listingPrice: {
+            gt: priceMin,
+            lte: priceMax
+          }
+        },
+        orderBy: {
+          datePosted: 'desc',
+        },
+        take: 1,
+      });
+
+      if (latestPost.length) {
+        latestPostDate = latestPost[0].datePosted;
+      } else {
+        // if no listings in db, scrape posts from last x days
+        const d = new Date();
+        latestPostDate = moment().subtract(5, 'd').toDate();
+      }
+    }
+
+
+    console.log('priceMin', priceMin);
+    console.log('priceMax', priceMax);
+    console.log('latestPostDate', latestPostDate);
 
     const listings = $("div[data-testid^='search-result_listing']")
       .map((index, element) => {
@@ -212,27 +236,24 @@ const zoopla = {
           .text()
           .replace('Listed on', '');
         const dateFormatted = moment(date, 'Do MMM gggg').toDate();
+       // console.log('dateFormatted', dateFormatted);
         const timezoneOffset = dateFormatted.getTimezoneOffset() * 60000;
         const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
+       // console.log('datePosted', datePosted);
 
         // for first scrape
-        olderThanXDays = moment(datePosted).diff(latestPostDate, "days") < -5;
+       // scrapeFirstTime = moment(datePosted).diff(latestPostDate, "days") < -5;
 
-        if (olderThanXDays) {
-          //console.log('olderThanXDays');
-          finishScraping = true;
+        if (scrapeFirstTime && moment(datePosted).diff(latestPostDate, "days") < -5) {
+          //console.log('scrapeFirstTime');
+         // finishScraping = true;
         }
 
-        if (
-          moment(datePosted).isSame(moment(latestPostDate)) &&
-          !latestPostDate
-        ) {
-          console.log('FINISH SCRAPING');
+        if (moment(datePosted) <= moment(latestPostDate)) {
           finishScraping = true;
         }
-
-        // find listings starting from previous day
-        if (helpers.isBeforeToday(datePosted)) {
+        
+        if (helpers.isBeforeToday(datePosted) && moment(datePosted) > moment(latestPostDate)) {
           return {
             url: BASE_URL + url,
             beds: beds ? parseInt(beds) : null,
@@ -245,7 +266,7 @@ const zoopla = {
     
 
     if (finishScraping) {
-      if (olderThanXDays) {
+      if (scrapeFirstTime) {
         return listings.filter(
           (listing) => moment(listing.datePosted).diff(latestPostDate, "days") >= -5,
         );
@@ -253,6 +274,7 @@ const zoopla = {
       return listings.filter(
         (listing) => moment(listing.datePosted) > moment(latestPostDate),
       );
+      
     } else {
       return listings;
     }
@@ -504,7 +526,7 @@ const zoopla = {
         data: listings[i],
       });
     }
-    console.log('Listings saved');
+    console.log('Listings saved to db');
   },
 };
 
