@@ -43,7 +43,18 @@ const test = async () => {
   const $ = cheerio.load(html);
   console.log('4');
 
-  await zoopla.agreeOnTerms();
+  try {
+    const elementHandle = await page.waitForSelector('#gdpr-consent-notice');
+    await page.waitForTimeout(2000);
+    const frame = await elementHandle.contentFrame();
+    await frame.waitForSelector('button#manageSettings');
+    await frame.click('button#manageSettings');
+    await frame.waitForSelector('button#saveAndExit');
+    await page.waitForTimeout(300);
+    await frame.click('button#saveAndExit');
+  } catch(e) {
+    console.log('Error agreeOnTeerms', e);
+  }
   console.log('5');
 
   const res = await zoopla.findServiceCharge($, page);
