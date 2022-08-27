@@ -18,7 +18,6 @@ let latestPostDate = null;
 const zoopla = {
   initialize: async () => {
     prisma = new Prisma.PrismaClient();
-    console.log('prisma', prisma);
 
     browser = await puppeteer.launch({
       headless: true,
@@ -132,8 +131,6 @@ const zoopla = {
         break;
       }
 
-      console.log('1');
-
       const url = new URL(mainUrl);
       // get access to URLSearchParams object
       const search_params = url.searchParams;
@@ -145,7 +142,6 @@ const zoopla = {
       mainUrl = newUrl;
 
       const listingsList = await this.scrapeListingsList(priceMin, priceMax);
-      console.log('2', listingsList);
 
       const listings = await this.scrapeListings(listingsList);
       console.log('listingsLength', listings?.length);
@@ -195,24 +191,12 @@ const zoopla = {
   },
 
   scrapeListingsList: async function (priceMin, priceMax) {
-    let html;
-
-    try {
-      html = await page.content();
-    } catch(e) {
-      console.log('scrapeListingsList', e);
-      await page.waitForTimeout(30000);
-      await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
-    }
-
-    console.log('1.5');
-    console.log('latestPostDate', latestPostDate);
-
-    // const html = await page.content();
-    // const $ = cheerio.load(html);
+    const html = await page.content();
+    const $ = cheerio.load(html);
     let scrapeFirstTime = false;
 
     if (!latestPostDate) {
+      console.log('1');
       const latestPost = await prisma.listing.findMany({
         where: {
           listingPrice: {
@@ -225,8 +209,7 @@ const zoopla = {
         },
         take: 1,
       });
-
-      console.log('1.6');
+      console.log('latestPost', latestPost);
 
       if (latestPost.length) {
         latestPostDate = latestPost[0].datePosted;
