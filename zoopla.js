@@ -4,7 +4,7 @@ const moment = require('moment');
 var URL = require('url').URL;
 const helpers = require('./helpers.js');
 //const db = require('./db/index.js');
-const Prisma = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client')
 
 const BASE_URL = 'https://www.zoopla.co.uk';
 const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/property/london/?page_size=25&q=London&radius=40&results_sort=newest_listings&search_source=refine&property_sub_type=flats&price_min=0&price_max=100000&pn=1';
@@ -17,7 +17,14 @@ let latestPostDate = null;
 
 const zoopla = {
   initialize: async () => {
-    prisma = new Prisma.PrismaClient();
+    prisma = new PrismaClient();
+
+    try {
+      const res = await prisma.$connect();
+      console.log('res', res);
+    } catch(e) {
+      console.log('Connection error', e);
+    }
 
     browser = await puppeteer.launch({
       headless: true,
