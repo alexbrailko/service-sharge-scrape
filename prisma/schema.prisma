@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("mysql://injoylv_a:Alex10749hello@server40.areait.lv/injoylv_service_charge")
+  url      = env("DATABASE_URL")
 }
 
 model Listing {
