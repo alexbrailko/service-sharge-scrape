@@ -72,6 +72,8 @@ cron.schedule('0 0 */2 * *', async function() {
   await zoopla.preparePages();
   await zoopla.close();
   console.log('FINISHED AT', date.toGMTString());
+}, {
+  runOnInit: true
 });
 
 // cron.schedule('* * * * *', async () => {
