@@ -97,7 +97,7 @@ const zoopla = {
       const priceMax = parseInt(search_params.get('price_max'));
       newUrl = helpers.updateURLParameter(newUrl, 'price_min', incrementPrice(priceMin, index));
       newUrl = helpers.updateURLParameter(newUrl, 'price_max', incrementPrice(priceMax, index));
-     // console.log('newUrl', newUrl);
+      console.log('newUrl', newUrl);
      console.log('2');
       await this.scrapeEachPage(newUrl);
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
