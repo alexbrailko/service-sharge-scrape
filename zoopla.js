@@ -21,7 +21,6 @@ const zoopla = {
 
     try {
       const res = await prisma.$connect();
-      console.log('res', res);
     } catch(e) {
       console.log('Connection error', e);
     }
@@ -203,7 +202,6 @@ const zoopla = {
     let scrapeFirstTime = false;
 
     if (!latestPostDate) {
-      console.log('1');
       const latestPost = await prisma.listing.findMany({
         where: {
           listingPrice: {
@@ -216,7 +214,6 @@ const zoopla = {
         },
         take: 1,
       });
-      console.log('latestPost', latestPost);
 
       if (latestPost.length) {
         latestPostDate = latestPost[0].datePosted;
