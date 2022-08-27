@@ -76,7 +76,6 @@ const zoopla = {
 
   preparePages: async function () {
       let newUrl = CURRENT_URL;
-      console.log('1');
 
       const incrementPrice = (price, index) => {
         if(index == 0) return price;
@@ -97,8 +96,7 @@ const zoopla = {
       const priceMax = parseInt(search_params.get('price_max'));
       newUrl = helpers.updateURLParameter(newUrl, 'price_min', incrementPrice(priceMin, index));
       newUrl = helpers.updateURLParameter(newUrl, 'price_max', incrementPrice(priceMax, index));
-      console.log('newUrl', newUrl);
-     console.log('2');
+     // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
     }
@@ -110,7 +108,7 @@ const zoopla = {
     } catch(e) {
       console.log('Error going to url', e);
     }
-    console.log('3');
+    
     const html = await page.content();
     const $ = cheerio.load(html);
     const numberOfPages = parseInt(
