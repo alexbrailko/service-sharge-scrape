@@ -27,14 +27,17 @@ const cron = require('node-cron');
 
 
 const test = async () => {
+  console.log('1');
   const browser = await puppeteer.launch({
     headless: true,
     ignoreDefaultArgs: ["--enable-automation"],
     args: ["--no-sandbox", "--disabled-setupid-sandbox"],
   });
+  console.log('2');
 
   const page = await browser.newPage();
   await page.goto("https://www.zoopla.co.uk/for-sale/details/62134222/?search_identifier=056afce560195e0740ed055a5235a6de");
+  console.log('3');
 
   const html = await page.content();
   const $ = cheerio.load(html);
@@ -46,6 +49,7 @@ const test = async () => {
   await frame.click('button#manageSettings');
   await frame.waitForSelector('button#saveAndExit');
   await frame.click('button#saveAndExit');
+  console.log('4');
 
   const res = await zoopla.findServiceCharge($, page);
   console.log('res', res);
@@ -66,4 +70,5 @@ const test = async () => {
 cron.schedule('* * * * *', async () => {
   console.log('running a task every minute');
   await test();
+  console.log('finish');
 });
