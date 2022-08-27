@@ -25,14 +25,14 @@ const zoopla = {
       args: [
         '--no-sandbox',
         '--disabled-setupid-sandbox',
-        // '--disable-site-isolation-trials',
-        // '--aggressive-cache-discard',
-        // '--disable-cache',
-        // '--disable-application-cache',
-        // '--disable-offline-load-stale-cache',
-        // '--disable-gpu-shader-disk-cache',
-        // '--media-cache-size=0',
-        // '--disk-cache-size=0',
+        '--disable-site-isolation-trials',
+        '--aggressive-cache-discard',
+        '--disable-cache',
+        '--disable-application-cache',
+        '--disable-offline-load-stale-cache',
+        '--disable-gpu-shader-disk-cache',
+        '--media-cache-size=0',
+        '--disk-cache-size=0',
       ],
     });
 
@@ -108,7 +108,7 @@ const zoopla = {
     } catch(e) {
       console.log('Error going to url', e);
     }
-    
+
     const html = await page.content();
     const $ = cheerio.load(html);
     const numberOfPages = parseInt(
