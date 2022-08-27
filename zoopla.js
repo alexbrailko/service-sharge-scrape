@@ -70,7 +70,7 @@ const zoopla = {
       await frame.click('button#saveAndExit');
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
-      zoopla.preparePages();
+      await zoopla.preparePages();
     }
   },
 
