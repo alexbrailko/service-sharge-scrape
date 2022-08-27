@@ -41,15 +41,10 @@ const test = async () => {
 
   const html = await page.content();
   const $ = cheerio.load(html);
-
-  const elementHandle = await page.waitForSelector('#gdpr-consent-notice');
-  await page.waitForTimeout(2000);
-  const frame = await elementHandle.contentFrame();
-  await frame.waitForSelector('button#manageSettings');
-  await frame.click('button#manageSettings');
-  await frame.waitForSelector('button#saveAndExit');
-  await frame.click('button#saveAndExit');
   console.log('4');
+
+  await zoopla.agreeOnTerms();
+  console.log('5');
 
   const res = await zoopla.findServiceCharge($, page);
   console.log('res', res);
