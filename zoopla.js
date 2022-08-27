@@ -18,6 +18,7 @@ let latestPostDate = null;
 const zoopla = {
   initialize: async () => {
     prisma = new Prisma.PrismaClient();
+    console.log('prisma', prisma);
 
     browser = await puppeteer.launch({
       headless: true,
@@ -194,8 +195,21 @@ const zoopla = {
   },
 
   scrapeListingsList: async function (priceMin, priceMax) {
-    const html = await page.content();
-    const $ = cheerio.load(html);
+    let html;
+
+    try {
+      html = await page.content();
+    } catch(e) {
+      console.log('scrapeListingsList', e);
+      await page.waitForTimeout(30000);
+      await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+    }
+
+    console.log('1.5');
+    console.log('latestPostDate', latestPostDate);
+
+    // const html = await page.content();
+    // const $ = cheerio.load(html);
     let scrapeFirstTime = false;
 
     if (!latestPostDate) {
@@ -211,6 +225,8 @@ const zoopla = {
         },
         take: 1,
       });
+
+      console.log('1.6');
 
       if (latestPost.length) {
         latestPostDate = latestPost[0].datePosted;
