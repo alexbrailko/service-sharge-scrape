@@ -131,6 +131,8 @@ const zoopla = {
         break;
       }
 
+      console.log('1');
+
       const url = new URL(mainUrl);
       // get access to URLSearchParams object
       const search_params = url.searchParams;
@@ -142,6 +144,7 @@ const zoopla = {
       mainUrl = newUrl;
 
       const listingsList = await this.scrapeListingsList(priceMin, priceMax);
+      console.log('2', listingsList);
 
       const listings = await this.scrapeListings(listingsList);
       console.log('listingsLength', listings?.length);
