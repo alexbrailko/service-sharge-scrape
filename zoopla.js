@@ -25,19 +25,19 @@ const zoopla = {
       args: [
         '--no-sandbox',
         '--disabled-setupid-sandbox',
-        '--disable-site-isolation-trials',
-        '--aggressive-cache-discard',
-        '--disable-cache',
-        '--disable-application-cache',
-        '--disable-offline-load-stale-cache',
-        '--disable-gpu-shader-disk-cache',
-        '--media-cache-size=0',
-        '--disk-cache-size=0',
+        // '--disable-site-isolation-trials',
+        // '--aggressive-cache-discard',
+        // '--disable-cache',
+        // '--disable-application-cache',
+        // '--disable-offline-load-stale-cache',
+        // '--disable-gpu-shader-disk-cache',
+        // '--media-cache-size=0',
+        // '--disk-cache-size=0',
       ],
     });
 
     page = await browser.newPage();
-    //await page.setViewport({ width: 1920, height: 1080 });
+    await page.setViewport({ width: 1920, height: 1080 });
 
     // await page.setRequestInterception(true);
     // const block_ressources = ['image', 'stylesheet', 'media', 'font', 'texttrack', 'object', 'beacon', 'csp_report', 'imageset'];
@@ -105,7 +105,11 @@ const zoopla = {
   },
 
   scrapeEachPage: async function (url) {
-    await page.goto(url);
+    try {
+      await page.goto(url);
+    } catch(e) {
+      console.log('Error going to url', e);
+    }
     console.log('3');
     const html = await page.content();
     const $ = cheerio.load(html);
