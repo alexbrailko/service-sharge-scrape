@@ -64,17 +64,21 @@ const cron = require('node-cron');
 //   await browser.close();
 // }
 
-// cron.schedule('0 0 */2 * *', async function() {
-//   var date = new Date();
-//   console.log('STARTED AT', date.toGMTString());
-//   await zoopla.initialize();
-//   await zoopla.agreeOnTerms();
-//   await zoopla.preparePages();
-//   await zoopla.close();
-//   console.log('FINISHED AT', date.toGMTString());
-// }, {
-//   runOnInit: true
-// });
+// every 2 days '0 0 */2 * *'
+
+cron.schedule('0 0 */3 * * *', async function() {
+  var date = new Date();
+  console.log('STARTED AT', date.toGMTString());
+  await zoopla.initialize();
+  await zoopla.agreeOnTerms();
+  await zoopla.preparePages();
+  await zoopla.close();
+  console.log('FINISHED AT', date.toGMTString());
+}, {
+  runOnInit: true
+});
+
+
 
 // cron.schedule('* * * * *', async () => {
 //   console.log('running a task every minute');

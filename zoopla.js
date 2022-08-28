@@ -95,7 +95,13 @@ const zoopla = {
         }
       }
 
+    var startTime = Date.now();
     for (let index = 0; index < 30; index++) {
+      // to prevent memory leak, stop the loop every hour
+      if (helpers.moreThanXHoursAgo(startTime)) {
+        break;
+      }
+
       const url = new URL(newUrl);
       const search_params = url.searchParams;
       const priceMin = parseInt(search_params.get('price_min'));
@@ -199,7 +205,6 @@ const zoopla = {
   scrapeListingsList: async function (priceMin, priceMax) {
     const html = await page.content();
     const $ = cheerio.load(html);
-    let scrapeFirstTime = false;
 
     if (!latestPostDate) {
       const latestPost = await prisma.listing.findMany({
@@ -224,14 +229,8 @@ const zoopla = {
       }
     }
 
-
-    console.log('priceMin', priceMin);
-    console.log('priceMax', priceMax);
-    console.log('latestPostDate', latestPostDate);
-
     const listings = $("div[data-testid^='search-result_listing']")
       .map((index, element) => {
-        // if (index > 10) return;
 
         const url = $(element)
           .find("a[data-testid='listing-details-image-link']")
@@ -247,18 +246,8 @@ const zoopla = {
           .text()
           .replace('Listed on', '');
         const dateFormatted = moment(date, 'Do MMM gggg').toDate();
-       // console.log('dateFormatted', dateFormatted);
         const timezoneOffset = dateFormatted.getTimezoneOffset() * 60000;
         const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
-       // console.log('datePosted', datePosted);
-
-        // for first scrape
-       // scrapeFirstTime = moment(datePosted).diff(latestPostDate, "days") < -5;
-
-        if (scrapeFirstTime && moment(datePosted).diff(latestPostDate, "days") < -5) {
-          //console.log('scrapeFirstTime');
-         // finishScraping = true;
-        }
 
         if (moment(datePosted) <= moment(latestPostDate)) {
           finishScraping = true;
@@ -277,11 +266,6 @@ const zoopla = {
     
 
     if (finishScraping) {
-      if (scrapeFirstTime) {
-        return listings.filter(
-          (listing) => moment(listing.datePosted).diff(latestPostDate, "days") >= -5,
-        );
-      }
       return listings.filter(
         (listing) => moment(listing.datePosted) > moment(latestPostDate),
       );

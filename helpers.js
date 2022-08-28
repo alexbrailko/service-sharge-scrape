@@ -25,6 +25,13 @@ function isBeforeToday(date) {
   return date < today;
 }
 
+function moreThanXHoursAgo (date, hours = 1) {
+  const HOURS = 1000 * 60 * (60 * hours);
+  const hoursAgo = Date.now() - HOURS;
+
+  return date < hoursAgo;
+}
+
 function updateURLParameter(url, param, paramVal) {
   var newAdditionalURL = '';
   var tempArray = url.split('?');
@@ -51,6 +58,7 @@ const helpers = {
   findMatchedElement,
   isBeforeToday,
   updateURLParameter,
+  moreThanXHoursAgo
 };
 
 module.exports = helpers;
