@@ -288,7 +288,9 @@ const zoopla = {
       let html;
 
       if (i % 4 === 0) {
+        
         await browser.close();
+        
         browser = await puppeteer.launch({
           headless: true,
           ignoreDefaultArgs: ['--enable-automation'],
@@ -297,6 +299,8 @@ const zoopla = {
             '--disabled-setupid-sandbox',
           ],
         });
+        await page.goto(BASE_URL);
+
       }
 
       try {
