@@ -302,8 +302,8 @@ const zoopla = {
           ],
         });
         page = await browser.newPage();
-        await zoopla.agreeOnTerms(true);
-        await page.goto(BASE_URL);
+        //await zoopla.agreeOnTerms(true);
+        await page.goto(listings[i].url);
       }
 
       try {
