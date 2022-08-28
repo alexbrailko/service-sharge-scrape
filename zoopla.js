@@ -111,6 +111,7 @@ const zoopla = {
      // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
+      await page.waitForTimeout(2000);
     }
   },
 
@@ -288,7 +289,6 @@ const zoopla = {
       let html;
 
       if (i % 4 === 0) {
-        
         await browser.close();
         
         browser = await puppeteer.launch({
@@ -299,8 +299,9 @@ const zoopla = {
             '--disabled-setupid-sandbox',
           ],
         });
+        page = await browser.newPage();
+        await zoopla.agreeOnTerms();
         await page.goto(BASE_URL);
-
       }
 
       try {
