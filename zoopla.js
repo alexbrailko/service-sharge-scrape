@@ -64,7 +64,7 @@ const zoopla = {
     await prisma.$disconnect();
   },
 
-  agreeOnTerms: async () => {
+  agreeOnTerms: async (repeat = false) => {
     try {
       const elementHandle = await page.waitForSelector('#gdpr-consent-notice');
       await page.waitForTimeout(2000);
@@ -76,7 +76,9 @@ const zoopla = {
       await frame.click('button#saveAndExit');
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
-      await zoopla.preparePages();
+      if (!repeat) {
+        await zoopla.preparePages();
+      }
     }
   },
 
@@ -300,7 +302,7 @@ const zoopla = {
           ],
         });
         page = await browser.newPage();
-        await zoopla.agreeOnTerms();
+        await zoopla.agreeOnTerms(true);
         await page.goto(BASE_URL);
       }
 
