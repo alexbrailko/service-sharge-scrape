@@ -31,19 +31,19 @@ const zoopla = {
       args: [
         '--no-sandbox',
         '--disabled-setupid-sandbox',
-        '--disable-site-isolation-trials',
-        '--aggressive-cache-discard',
-        '--disable-cache',
-        '--disable-application-cache',
-        '--disable-offline-load-stale-cache',
-        '--disable-gpu-shader-disk-cache',
-        '--media-cache-size=0',
-        '--disk-cache-size=0',
+        // '--disable-site-isolation-trials',
+        // '--aggressive-cache-discard',
+        // '--disable-cache',
+        // '--disable-application-cache',
+        // '--disable-offline-load-stale-cache',
+        // '--disable-gpu-shader-disk-cache',
+        // '--media-cache-size=0',
+        // '--disk-cache-size=0',
       ],
     });
 
     page = await browser.newPage();
-    await page.setViewport({ width: 1920, height: 1080 });
+    //await page.setViewport({ width: 1920, height: 1080 });
 
     // await page.setRequestInterception(true);
     // const block_ressources = ['image', 'stylesheet', 'media', 'font', 'texttrack', 'object', 'beacon', 'csp_report', 'imageset'];
@@ -286,6 +286,18 @@ const zoopla = {
 
     for (var i = 0; i < listings.length; i++) {
       let html;
+
+      if (i % 4 === 0) {
+        await browser.close();
+        browser = await puppeteer.launch({
+          headless: true,
+          ignoreDefaultArgs: ['--enable-automation'],
+          args: [
+            '--no-sandbox',
+            '--disabled-setupid-sandbox',
+          ],
+        });
+      }
 
       try {
         await Promise.all([page.waitForNavigation(), page.goto(listings[i].url)]);
