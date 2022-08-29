@@ -26,7 +26,7 @@ const zoopla = {
     }
 
     browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
       ignoreDefaultArgs: ['--enable-automation'],
       args: [
         '--no-sandbox',
@@ -152,7 +152,7 @@ const zoopla = {
         await browser.close();
         
         browser = await puppeteer.launch({
-          headless: false,
+          headless: true,
           ignoreDefaultArgs: ['--enable-automation'],
           args: [
             '--no-sandbox',
