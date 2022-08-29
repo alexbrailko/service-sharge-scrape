@@ -154,7 +154,7 @@ const zoopla = {
       page = await browser.newPage();
      
       await page.goto(mainUrl);
-      await zoopla.agreeOnTerms(true);
+      //await zoopla.agreeOnTerms(true);
 
       try {
         await page.waitForSelector("div[data-testid^='search-result_listing']", {
