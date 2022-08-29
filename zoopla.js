@@ -68,7 +68,7 @@ const zoopla = {
     try {
       await page.waitForTimeout(2000);
       const elementHandle = await page.waitForSelector('#gdpr-consent-notice', {
-        timeout: 5000,
+        timeout: 3000,
       });
       await page.waitForTimeout(2000);
       const frame = await elementHandle.contentFrame();
@@ -152,8 +152,9 @@ const zoopla = {
         ],
       });
       page = await browser.newPage();
+     
+      await page.goto(mainUrl);
       await zoopla.agreeOnTerms(true);
-      await page.goto(url);
 
       try {
         await page.waitForSelector("div[data-testid^='search-result_listing']", {
