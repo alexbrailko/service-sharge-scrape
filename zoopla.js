@@ -26,7 +26,7 @@ const zoopla = {
     }
 
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       ignoreDefaultArgs: ['--enable-automation'],
       args: [
         '--no-sandbox',
@@ -66,13 +66,14 @@ const zoopla = {
 
   agreeOnTerms: async (repeat = false) => {
     try {
+      await page.waitForTimeout(2000);
       const elementHandle = await page.waitForSelector('#gdpr-consent-notice');
       await page.waitForTimeout(2000);
       const frame = await elementHandle.contentFrame();
       await frame.waitForSelector('button#manageSettings');
       await frame.click('button#manageSettings');
       await frame.waitForSelector('button#saveAndExit');
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(1000);
       await frame.click('button#saveAndExit');
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
@@ -97,12 +98,12 @@ const zoopla = {
         }
       }
 
-    var startTime = Date.now();
+      // var startTime = Date.now();
     for (let index = 0; index < 30; index++) {
       // to prevent memory leak, stop the loop every hour
-      if (helpers.moreThanXHoursAgo(startTime)) {
-        break;
-      }
+      // if (helpers.moreThanXHoursAgo(startTime)) {
+      //   break;
+      // }
 
       const url = new URL(newUrl);
       const search_params = url.searchParams;
@@ -144,6 +145,22 @@ const zoopla = {
       } catch(e) {
         console.log('E', e);
         break;
+      }
+
+      if ( i && i % 3 === 0) {
+        await browser.close();
+        
+        browser = await puppeteer.launch({
+          headless: false,
+          ignoreDefaultArgs: ['--enable-automation'],
+          args: [
+            '--no-sandbox',
+            '--disabled-setupid-sandbox',
+          ],
+        });
+        page = await browser.newPage();
+        await zoopla.agreeOnTerms(true);
+        await page.goto(mainUrl);
       }
 
       const url = new URL(mainUrl);
@@ -289,22 +306,6 @@ const zoopla = {
 
     for (var i = 0; i < listings.length; i++) {
       let html;
-
-      if (i % 4 === 0) {
-        await browser.close();
-        
-        browser = await puppeteer.launch({
-          headless: true,
-          ignoreDefaultArgs: ['--enable-automation'],
-          args: [
-            '--no-sandbox',
-            '--disabled-setupid-sandbox',
-          ],
-        });
-        page = await browser.newPage();
-        //await zoopla.agreeOnTerms(true);
-        await page.goto(listings[i].url);
-      }
 
       try {
         await Promise.all([page.waitForNavigation(), page.goto(listings[i].url)]);
