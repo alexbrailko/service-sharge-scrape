@@ -78,6 +78,7 @@ const zoopla = {
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
       if (!repeat) {
+        console.log('PREPARE PAGES');
         await zoopla.preparePages();
       }
     }
@@ -160,7 +161,7 @@ const zoopla = {
         });
         page = await browser.newPage();
         await zoopla.agreeOnTerms(true);
-        await page.goto(mainUrl);
+        await page.goto(url);
       }
 
       const url = new URL(mainUrl);
