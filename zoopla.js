@@ -67,7 +67,9 @@ const zoopla = {
   agreeOnTerms: async (repeat = false) => {
     try {
       await page.waitForTimeout(2000);
-      const elementHandle = await page.waitForSelector('#gdpr-consent-notice');
+      const elementHandle = await page.waitForSelector('#gdpr-consent-notice', {
+        timeout: 5000,
+      });
       await page.waitForTimeout(2000);
       const frame = await elementHandle.contentFrame();
       await frame.waitForSelector('button#manageSettings');
@@ -138,6 +140,20 @@ const zoopla = {
 
     for (var i = 0; i < numberOfPages; i++) {
       console.log('url', mainUrl);
+      
+      await browser.close();
+      
+      browser = await puppeteer.launch({
+        headless: true,
+        ignoreDefaultArgs: ['--enable-automation'],
+        args: [
+          '--no-sandbox',
+          '--disabled-setupid-sandbox',
+        ],
+      });
+      page = await browser.newPage();
+      await zoopla.agreeOnTerms(true);
+      await page.goto(url);
 
       try {
         await page.waitForSelector("div[data-testid^='search-result_listing']", {
@@ -148,21 +164,6 @@ const zoopla = {
         break;
       }
 
-      if ( i && i % 3 === 0) {
-        await browser.close();
-        
-        browser = await puppeteer.launch({
-          headless: true,
-          ignoreDefaultArgs: ['--enable-automation'],
-          args: [
-            '--no-sandbox',
-            '--disabled-setupid-sandbox',
-          ],
-        });
-        page = await browser.newPage();
-        await zoopla.agreeOnTerms(true);
-        await page.goto(url);
-      }
 
       const url = new URL(mainUrl);
       // get access to URLSearchParams object
