@@ -64,7 +64,7 @@ const zoopla = {
     await prisma.$disconnect();
   },
 
-  agreeOnTerms: async (repeat = false) => {
+  agreeOnTerms: async () => {
     try {
       await page.waitForTimeout(2000);
       const elementHandle = await page.waitForSelector('#gdpr-consent-notice', {
@@ -79,10 +79,6 @@ const zoopla = {
       await frame.click('button#saveAndExit');
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
-      if (!repeat) {
-        console.log('PREPARE PAGES');
-        await zoopla.preparePages();
-      }
     }
   },
 
