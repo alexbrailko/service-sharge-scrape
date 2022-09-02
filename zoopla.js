@@ -117,7 +117,7 @@ const zoopla = {
      // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
       if (priceMax == 10000000) {
-        zoopla.removeDuplicates();
+        await this.removeDuplicates();
         break;
       }
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
@@ -552,8 +552,6 @@ const zoopla = {
   },
 
   removeDuplicates: async function() {
-     const prisma = new PrismaClient();
-
       const rows = await prisma.listing.findMany();
 
       function isDuplicate(entry, arr) {
@@ -578,6 +576,7 @@ const zoopla = {
               }
           }
       })
+
       if (duplicateIds.length) {
         console.log('DELETED DUPLICATES', duplicateIds.length);
       }
