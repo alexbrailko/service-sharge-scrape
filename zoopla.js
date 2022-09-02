@@ -113,7 +113,6 @@ const zoopla = {
      // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
       if (priceMax == 10000000) {
-        await this.removeDuplicates();
         break;
       }
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
