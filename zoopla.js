@@ -116,6 +116,9 @@ const zoopla = {
       newUrl = helpers.updateURLParameter(newUrl, 'price_max', incrementPrice(priceMax, index));
      // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
+      if (priceMax == 10000000) {
+        break;
+      }
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
       await page.waitForTimeout(2000);
     }
