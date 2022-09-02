@@ -117,6 +117,7 @@ const zoopla = {
      // console.log('newUrl', newUrl);
       await this.scrapeEachPage(newUrl);
       if (priceMax == 10000000) {
+        zoopla.removeDuplicates();
         break;
       }
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
@@ -506,7 +507,7 @@ const zoopla = {
       }
     }
 
-    return urls.reverse();
+    return urls;
   },
 
   extractNumberFromText: (el, str) => {
@@ -549,6 +550,38 @@ const zoopla = {
     }
     console.log('Listings saved to db');
   },
+
+  removeDuplicates: async function() {
+     const prisma = new PrismaClient();
+
+      const rows = await prisma.listing.findMany();
+
+      function isDuplicate(entry, arr) {
+        return arr.some(x => (entry.address == x.address) && (entry.listingPrice == x.listingPrice))
+      }
+
+      let newArray = [];
+      let duplicateIds = [];
+
+      for (const entry of rows) {
+        if (!isDuplicate(entry, newArray)) { 
+          newArray.push(entry);
+        } else {
+         duplicateIds.push(entry.id);
+        }
+      }
+
+      await prisma.listing.deleteMany({
+          where: {
+              id: {
+                  in: duplicateIds
+              }
+          }
+      })
+      if (duplicateIds.length) {
+        console.log('DELETED DUPLICATES', duplicateIds.length);
+      }
+  }
 };
 
 module.exports = zoopla;
