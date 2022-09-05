@@ -66,7 +66,7 @@ const cron = require('node-cron');
 
 // every 2 days '0 0 */2 * *'
 
-cron.schedule('0 0 */1 * *', async function() {
+cron.schedule('0 0 */2 * *', async function() {
   var date = new Date();
   console.log('STARTED AT', date.toGMTString());
   await zoopla.initialize();
@@ -76,7 +76,7 @@ cron.schedule('0 0 */1 * *', async function() {
   await zoopla.close();
   console.log('FINISHED AT', date.toGMTString());
 }, {
-  runOnInit: true
+  runOnInit: false
 });
 
 
