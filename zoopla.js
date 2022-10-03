@@ -575,6 +575,16 @@ const zoopla = {
       if (duplicateIds.length) {
         console.log('DELETED DUPLICATES', duplicateIds.length);
       }
+  },
+  removeOldListings: async () => {
+    await prisma.listing.deleteMany({
+      where: {
+          datePosted: {
+              lt: moment().subtract(50, 'days').toDate()
+          }
+      }
+    });
+
   }
 };
 

@@ -73,6 +73,7 @@ cron.schedule('0 0 */2 * *', async function() {
   await zoopla.agreeOnTerms();
   await zoopla.preparePages();
   await zoopla.removeDuplicates();
+  await zoopla.removeOldListings();
   await zoopla.close();
   console.log('FINISHED AT', date.toGMTString());
 }, {
