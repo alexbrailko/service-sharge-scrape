@@ -15,6 +15,7 @@ let prisma = null;
 let finishScraping = false;
 let latestPostDate = null;
 
+
 const zoopla = {
   initialize: async () => {
     prisma = new PrismaClient();
