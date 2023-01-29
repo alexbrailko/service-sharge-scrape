@@ -7,7 +7,7 @@ const helpers = require('./helpers.js');
 const { PrismaClient } = require('@prisma/client')
 
 const BASE_URL = 'https://www.zoopla.co.uk';
-const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/property/london/?page_size=25&q=London&radius=40&results_sort=newest_listings&search_source=refine&property_sub_type=flats&price_min=0&price_max=100000&pn=1';
+const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&radius=40&results_sort=newest_listings&search_source=refine&price_min=0&price_max=100000&pn=1';
 
 let browser = null;
 let page = null;
