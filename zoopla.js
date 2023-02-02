@@ -1,10 +1,18 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
 const cheerio = require('cheerio');
 const moment = require('moment');
 var URL = require('url').URL;
 const helpers = require('./helpers.js');
 //const db = require('./db/index.js');
-const { PrismaClient } = require('@prisma/client')
+const { PrismaClient } = require('@prisma/client');
+
+// Add stealth plugin and use defaults (all tricks to hide puppeteer usage)
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+puppeteer.use(StealthPlugin())
+
+// Add adblocker plugin to block all ads and trackers (saves bandwidth)
+const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker')
+puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
 
 const BASE_URL = 'https://www.zoopla.co.uk';
 const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&radius=40&results_sort=newest_listings&search_source=refine&price_min=0&price_max=100000&pn=1';
@@ -14,6 +22,18 @@ let page = null;
 let prisma = null;
 let finishScraping = false;
 let latestPostDate = null;
+
+const puppeteerArgs = {
+  headless: true,
+  // ignoreDefaultArgs: ['--enable-automation'],
+  ignoreHTTPSErrors: true,
+  slowMo: 0,
+  args: ['--window-size=1400,900',
+  '--remote-debugging-port=9222',
+  "--remote-debugging-address=0.0.0.0", // You know what your doing?
+  '--disable-gpu', "--disable-features=IsolateOrigins,site-per-process", '--blink-settings=imagesEnabled=true'
+  ],
+}
 
 
 const zoopla = {
@@ -26,22 +46,7 @@ const zoopla = {
       console.log('Connection error', e);
     }
 
-    browser = await puppeteer.launch({
-      headless: true,
-      ignoreDefaultArgs: ['--enable-automation'],
-      args: [
-        '--no-sandbox',
-        '--disabled-setupid-sandbox',
-        // '--disable-site-isolation-trials',
-        // '--aggressive-cache-discard',
-        // '--disable-cache',
-        // '--disable-application-cache',
-        // '--disable-offline-load-stale-cache',
-        // '--disable-gpu-shader-disk-cache',
-        // '--media-cache-size=0',
-        // '--disk-cache-size=0',
-      ],
-    });
+    browser = await puppeteer.launch(puppeteerArgs);
 
     page = await browser.newPage();
     //await page.setViewport({ width: 1920, height: 1080 });
@@ -111,7 +116,7 @@ const zoopla = {
       const priceMax = parseInt(search_params.get('price_max'));
       newUrl = helpers.updateURLParameter(newUrl, 'price_min', incrementPrice(priceMin, index));
       newUrl = helpers.updateURLParameter(newUrl, 'price_max', incrementPrice(priceMax, index));
-     // console.log('newUrl', newUrl);
+
       await this.scrapeEachPage(newUrl);
       if (priceMax == 10000000) {
         break;
@@ -143,21 +148,14 @@ const zoopla = {
       
       await browser.close();
       
-      browser = await puppeteer.launch({
-        headless: true,
-        ignoreDefaultArgs: ['--enable-automation'],
-        args: [
-          '--no-sandbox',
-          '--disabled-setupid-sandbox',
-        ],
-      });
+      browser = await puppeteer.launch(puppeteerArgs);
       page = await browser.newPage();
      
       await page.goto(mainUrl);
       //await zoopla.agreeOnTerms(true);
 
       try {
-        await page.waitForSelector("div[data-testid^='search-result_listing']", {
+        await page.waitForSelector("div[data-testid^='regular-listings']", {
           timeout: 10000,
         });
       } catch(e) {
@@ -214,7 +212,7 @@ const zoopla = {
         await Promise.all([
           page.waitForNavigation(),
           page.goto(mainUrl),
-          page.waitForSelector("div[data-testid^='search-result_listing']"),
+          page.waitForSelector("div[data-testid^='regular-listings']"),
         ]);
       } catch(e) {
         console.log('Error in scrapeEachPage', e);
@@ -252,20 +250,18 @@ const zoopla = {
       }
     }
 
-    const listings = $("div[data-testid^='search-result_listing']")
+    const listings = $("div[data-testid^='regular-listings']").children()
       .map((index, element) => {
-
+        
         const url = $(element)
-          .find("a[data-testid='listing-details-image-link']")
+          .find("a")
           .attr('href');
         const beds = $(element)
-          .find("div[data-testid='listing-spec'] > div")
-          .attr('content');
+          .find("use[href='#bedroom-medium']").parent().next().text();
         const baths = $(element)
-          .find("div[data-testid='listing-spec'] > div:nth-of-type(2)")
-          .attr('content');
+          .find("use[href='#bathroom-medium']").parent().next().text();
         const date = $(element)
-          .find("span[data-testid='date-published']")
+          .find("li:contains('Listed on')")
           .text()
           .replace('Listed on', '');
         const dateFormatted = moment(date, 'Do MMM gggg').toDate();
@@ -275,7 +271,7 @@ const zoopla = {
         if (moment(datePosted) <= moment(latestPostDate)) {
           finishScraping = true;
         }
-        
+
         if (helpers.isBeforeToday(datePosted) && moment(datePosted) > moment(latestPostDate)) {
           return {
             url: BASE_URL + url,
@@ -286,6 +282,8 @@ const zoopla = {
         }
       })
       .get();
+
+     
     
 
     if (finishScraping) {
@@ -301,11 +299,7 @@ const zoopla = {
   scrapeListings: async function (listings) {
     if (!listings.length) return;
 
-    try {
-      await page.waitForSelector("div[data-testid^='search-result_listing']");
-    } catch(e) {
-      console.log('Error in scrapeListings');
-    }
+    await page.waitForTimeout(3000);
 
     for (var i = 0; i < listings.length; i++) {
       let html;
@@ -453,7 +447,7 @@ const zoopla = {
     const urls = [];
 
     try {
-      await page.waitForSelector("li[data-testid='gallery-image']", {
+      await page.waitForSelector("li.splide__slide", {
         timeout: 5000,
       });
     } catch (e) {
@@ -461,49 +455,67 @@ const zoopla = {
       return [];
     }
 
-    //await page.waitForSelector("li[data-testid='gallery-image']");
-    // const imageLengthString = $("div[data-testid='gallery-counter'] span").text();
-    // console.log('imageLengthString', imageLengthString);
-    // const n = imageLengthString.lastIndexOf('/');
-    // const imageLength = imageLengthString.substring(n + 1)
-    // console.log('!!', parseInt(imageLength));
+    $("li.splide__slide:not(.splide__slide--clone)").each(async (i, el) => {
+    
+      const srcset =  $(el).find('picture source').attr('srcset').split(',');
+      const small = srcset
+      .find((img) => img.includes('480w'))
+      .replace(':p 480w', '')
+      .trim();
+      
+      const medium = srcset
+      .find((img) => img.includes('768w'))
+      .replace(':p 768w', '')
+      .trim();
+      const large = srcset
+      .find((img) => img.includes('1200w'))
+      .replace(':p 1200w', '')
+      .trim();
 
-    for (var i = 0; i < $("li[data-testid='gallery-image']").length; i++) {
-      const srcset = await page.$$eval(
-        "li[data-testid='gallery-image'][aria-hidden='false'] picture source",
-        (pic) => {
-          return pic.map((i) => i.srcset);
-        },
-      );
-      const srcsetArr = srcset[0].split(',');
-
-      const small = srcsetArr
-        .find((img) => img.includes('480w'))
-        .replace(':p 480w', '');
-      const medium = srcsetArr
-        .find((img) => img.includes('768w'))
-        .replace(':p 768w', '');
-      const large = srcsetArr
-        .find((img) => img.includes('1200w'))
-        .replace(':p 1200w', '');
-
-      urls.push({ small, medium, large });
-
-      try {
-        await page.waitForSelector(
-          "section[aria-labelledby='listing-gallery-heading'] button[data-testid='arrow_right']",
-        );
-        await page.click(
-          "section[aria-labelledby='listing-gallery-heading'] button[data-testid='arrow_right']",
-        );
-        await page.waitForTimeout(700);
-      } catch (e) {
-        console.log('arrow_right selector errror', e);
-        break;
-      }
-    }
+      urls.push({ small, medium, large });    
+    });
 
     return urls;
+
+    // for (var i = 0; i < $("li.splide__slide:not(.splide__slide--clone)").length; i++) {
+    //   const srcset = await page.$$eval(
+    //     "li.splide__slide:not(.splide__slide--clone) picture source",
+    //     (pic) => {
+    //       return pic.map((i) => i.srcset);
+    //     },
+    //   );
+    //   const srcsetArr = srcset[0].split(',');
+
+    //   const small = srcsetArr
+    //     .find((img) => img.includes('480w'))
+    //     .replace(':p 480w', '');
+    //   const medium = srcsetArr
+    //     .find((img) => img.includes('768w'))
+    //     .replace(':p 768w', '');
+    //   const large = srcsetArr
+    //     .find((img) => img.includes('1200w'))
+    //     .replace(':p 1200w', '');
+
+    //   urls.push({ small, medium, large });
+
+    //   try {
+    //     await page.waitForSelector(
+    //       "div.splide__arrow--next button",
+    //       {
+    //         timeout: 5000,
+    //       }
+    //     );
+    //     await page.click(
+    //       "div.splide__arrow--next button",
+    //     );
+    //     await page.waitForTimeout(1000);
+    //   } catch (e) {
+    //     console.log('arrow_right selector errror', e);
+    //     break;
+    //   }
+    // }
+
+    
   },
 
   extractNumberFromText: (el, str) => {

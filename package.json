@@ -15,7 +15,10 @@
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.34",
     "node-cron": "^3.0.2",
-    "puppeteer": "^15.5.0"
+    "puppeteer": "^15.5.0",
+    "puppeteer-extra": "^3.3.4",
+    "puppeteer-extra-plugin-adblocker": "^2.13.5",
+    "puppeteer-extra-plugin-stealth": "^2.11.1"
   },
   "devDependencies": {
     "prisma": "^4.2.1"
