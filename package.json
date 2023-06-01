@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": "16.13.1"
+  },
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -12,9 +15,12 @@
   "dependencies": {
     "@prisma/client": "^4.2.1",
     "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.0.3",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.34",
     "node-cron": "^3.0.2",
+    "node-fetch": "^2.6.9",
+    "node-geocoder": "^4.2.0",
     "puppeteer": "^15.5.0",
     "puppeteer-extra": "^3.3.4",
     "puppeteer-extra-plugin-adblocker": "^2.13.5",

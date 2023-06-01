@@ -8,17 +8,20 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+ // shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model Listing {
   id            String      @id @default(uuid())
   url           String
+  type          String
   datePosted    DateTime
   title         String
   listingPrice  Int
   beds          Int?
   baths         Int?
   address       String
+  postCode      String
   serviceCharge Int
   groundRent    Int?
   pictures      String       @db.LongText

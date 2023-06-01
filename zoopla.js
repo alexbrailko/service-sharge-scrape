@@ -5,17 +5,23 @@ var URL = require('url').URL;
 const helpers = require('./helpers.js');
 //const db = require('./db/index.js');
 const { PrismaClient } = require('@prisma/client');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+require('dotenv').config();
+
+
 
 // Add stealth plugin and use defaults (all tricks to hide puppeteer usage)
-const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-puppeteer.use(StealthPlugin())
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
 // Add adblocker plugin to block all ads and trackers (saves bandwidth)
-const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker')
-puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
+puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
 const BASE_URL = 'https://www.zoopla.co.uk';
-const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&radius=40&results_sort=newest_listings&search_source=refine&price_min=0&price_max=100000&pn=1';
+const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&radius=40&results_sort=newest_listings&search_source=refine&price_min=1800000&price_max=1900000&pn=5';
+
+
 
 let browser = null;
 let page = null;
@@ -24,16 +30,19 @@ let finishScraping = false;
 let latestPostDate = null;
 
 const puppeteerArgs = {
-  headless: true,
+  headless: false,
   // ignoreDefaultArgs: ['--enable-automation'],
   ignoreHTTPSErrors: true,
   slowMo: 0,
-  args: ['--window-size=1400,900',
-  '--remote-debugging-port=9222',
-  "--remote-debugging-address=0.0.0.0", // You know what your doing?
-  '--disable-gpu', "--disable-features=IsolateOrigins,site-per-process", '--blink-settings=imagesEnabled=true'
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--window-size=1400,900',
+    '--remote-debugging-port=9222',
+    "--remote-debugging-address=0.0.0.0", // You know what your doing?
+    '--disable-gpu', "--disable-features=IsolateOrigins,site-per-process", '--blink-settings=imagesEnabled=true'
   ],
-}
+};
 
 
 const zoopla = {
@@ -41,12 +50,14 @@ const zoopla = {
     prisma = new PrismaClient();
 
     try {
-      const res = await prisma.$connect();
+      await prisma.$connect();
     } catch(e) {
       console.log('Connection error', e);
     }
 
     browser = await puppeteer.launch(puppeteerArgs);
+
+    console.log('launch');
 
     page = await browser.newPage();
     //await page.setViewport({ width: 1920, height: 1080 });
@@ -60,6 +71,8 @@ const zoopla = {
     //     request.continue();
     // });
 
+    
+
     await page.goto(BASE_URL);
 
     // return page;
@@ -72,16 +85,16 @@ const zoopla = {
 
   agreeOnTerms: async () => {
     try {
-      await page.waitForTimeout(2000);
+     // await page.waitForTimeout(2000);
       const elementHandle = await page.waitForSelector('#gdpr-consent-notice', {
         timeout: 3000,
       });
-      await page.waitForTimeout(2000);
+     // await page.waitForTimeout(2000);
       const frame = await elementHandle.contentFrame();
-      await frame.waitForSelector('button#manageSettings');
+      await frame.waitForSelector('button#manageSettings', { timeout: 3000 });
       await frame.click('button#manageSettings');
-      await frame.waitForSelector('button#saveAndExit');
-      await page.waitForTimeout(1000);
+      await frame.waitForSelector('button#saveAndExit', { timeout: 3000 });
+     // await page.waitForTimeout(1000);
       await frame.click('button#saveAndExit');
     } catch(e) {
       console.log('Error agreeOnTeerms', e);
@@ -91,20 +104,22 @@ const zoopla = {
   preparePages: async function () {
       let newUrl = CURRENT_URL;
 
-      const incrementPrice = (price, index) => {
+      const incrementPrice = (price, index, minPrice = false) => {
         if(index == 0) return price;
 
-        if (price < 1000000) {
-          return price + 100000;
-        } else if (price < 2500000) {
-          return price + 300000;
+        if (price < 500000) {
+          if (!price) return 100000;
+         // if(index == 1 && minPrice) return price + 10001;
+          return  price + 10000;
+        } else if (price < 1000000) {
+          return price + 50000;
         } else {
-          return price + 500000;
+          return price + 100000;
         }
       }
 
       // var startTime = Date.now();
-    for (let index = 0; index < 30; index++) {
+    for (let index = 0; index < 42; index++) {
       // to prevent memory leak, stop the loop every hour
       // if (helpers.moreThanXHoursAgo(startTime)) {
       //   break;
@@ -114,31 +129,35 @@ const zoopla = {
       const search_params = url.searchParams;
       const priceMin = parseInt(search_params.get('price_min'));
       const priceMax = parseInt(search_params.get('price_max'));
-      newUrl = helpers.updateURLParameter(newUrl, 'price_min', incrementPrice(priceMin, index));
+      newUrl = helpers.updateURLParameter(newUrl, 'price_min', incrementPrice(priceMin, index, true));
       newUrl = helpers.updateURLParameter(newUrl, 'price_max', incrementPrice(priceMax, index));
-
+      
+      //console.log('min', incrementPrice(priceMin, index, 'min'), 'max', incrementPrice(priceMax, index));
       await this.scrapeEachPage(newUrl);
+
       if (priceMax == 10000000) {
         break;
       }
       newUrl = helpers.updateURLParameter(newUrl, 'pn', 1);
-      await page.waitForTimeout(2000);
+
+      await page.waitForTimeout(1000);
     }
   },
 
   scrapeEachPage: async function (url) {
     try {
-      await page.goto(url);
+      await page.goto(url, {"waitUntil" : "networkidle0"});
     } catch(e) {
       console.log('Error going to url', e);
     }
 
     const html = await page.content();
     const $ = cheerio.load(html);
-    const numberOfPages = parseInt(
-      $("div[data-testid='pagination'] li").eq(-2).find('a').text(),
-    );
-    if (isNaN(numberOfPages)) return;
+    // const numberOfPages = parseInt(
+    //   $("div[data-testid='pagination'] li").eq(-2).find('a').text(),
+    // );
+    const numberOfPages = 40;
+    //if (isNaN(numberOfPages)) return;
  
     let mainUrl = url;
     let listingsData = [];
@@ -146,17 +165,18 @@ const zoopla = {
     for (var i = 0; i < numberOfPages; i++) {
       console.log('url', mainUrl);
       
-      await browser.close();
+      // await browser.close();
       
-      browser = await puppeteer.launch(puppeteerArgs);
-      page = await browser.newPage();
+      // browser = await puppeteer.launch(puppeteerArgs);
+      // page = await browser.newPage();
+      
      
-      await page.goto(mainUrl);
-      //await zoopla.agreeOnTerms(true);
+      await page.goto(mainUrl, {"waitUntil" : "networkidle0"});
+     // await zoopla.agreeOnTerms();
 
       try {
         await page.waitForSelector("div[data-testid^='regular-listings']", {
-          timeout: 10000,
+          timeout: 5000,
         });
       } catch(e) {
         console.log('E', e);
@@ -175,21 +195,29 @@ const zoopla = {
       mainUrl = newUrl;
 
       const listingsList = await this.scrapeListingsList(priceMin, priceMax);
+      //console.log('listingsList length', listingsList.length);
 
       const listings = await this.scrapeListings(listingsList);
       console.log('listingsLength', listings?.length);
+
+      // if (!listings?.length && pn != 40) {
+      //   await zoopla.close();
+      //   await zoopla.initialize();
+      //   await zoopla.agreeOnTerms();
+      // }
 
       // remove duplicates from listings
       if (!listingsData.length) {
         listingsData.push.apply(listingsData, listings);
       } else {
         listingsData.push.apply(listingsData, listings);
-        listingsData.filter(
+        listingsData = listingsData.filter(
           (v, i, a) =>
             a.findIndex((v2) =>
-              ['address', 'listingPrice'].every((k) => v2[k] === v[k]),
+              ['address'].every((k) => v2[k] === v[k]),
             ) === i,
         );
+        
         await this.saveToDb(listingsData);
         
         // console.log('listings', listingsData);
@@ -207,17 +235,17 @@ const zoopla = {
       }
 
       // go to new page
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(1000);
       try {
         await Promise.all([
           page.waitForNavigation(),
-          page.goto(mainUrl),
-          page.waitForSelector("div[data-testid^='regular-listings']"),
+          page.goto(mainUrl, {"waitUntil" : "networkidle0"}),
+          page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
         ]);
       } catch(e) {
-        console.log('Error in scrapeEachPage', e);
-        await page.waitForTimeout(120000);
-        await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+        console.log('Error in scrapeEachPage, wait for regular-listings selector');
+       // await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+       break;
       }
 
     }
@@ -245,12 +273,19 @@ const zoopla = {
         latestPostDate = latestPost[0].datePosted;
       } else {
         // if no listings in db, scrape posts from last x days
-        const d = new Date();
-        latestPostDate = moment().subtract(5, 'd').toDate();
+        // const d = new Date();
+        latestPostDate = moment().subtract(9999, 'd').toDate();
       }
     }
 
-    const listings = $("div[data-testid^='regular-listings']").children()
+    const listingsContainer = $("div[data-testid^='regular-listings']").children();
+
+
+    if (!listingsContainer.length) {
+      finishScraping = true;
+    }
+
+    const listings = $(listingsContainer)
       .map((index, element) => {
         
         const url = $(element)
@@ -268,23 +303,23 @@ const zoopla = {
         const timezoneOffset = dateFormatted.getTimezoneOffset() * 60000;
         const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
 
-        if (moment(datePosted) <= moment(latestPostDate)) {
-          finishScraping = true;
-        }
+        // if (moment(datePosted) <= moment(latestPostDate)) {
+        //   finishScraping = true;
+        // }
 
-        if (helpers.isBeforeToday(datePosted) && moment(datePosted) > moment(latestPostDate)) {
+       // if (
+         // datePosted > moment().subtract(1, 'day') && 
+        //  moment(datePosted) > moment(latestPostDate)
+       // ) {
           return {
             url: BASE_URL + url,
             beds: beds ? parseInt(beds) : null,
             baths: baths ? parseInt(baths) : null,
             datePosted,
           };
-        }
+       // }
       })
       .get();
-
-     
-    
 
     if (finishScraping) {
       return listings.filter(
@@ -299,18 +334,24 @@ const zoopla = {
   scrapeListings: async function (listings) {
     if (!listings.length) return;
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
 
     for (var i = 0; i < listings.length; i++) {
       let html;
 
       try {
-        await Promise.all([page.waitForNavigation(), page.goto(listings[i].url)]);
+        // await Promise.all([
+        //   page.waitForNavigation(), 
+        //   page.goto(listings[i].url, {"waitUntil" : "networkidle0"})
+        // ]);
+        await page.goto(listings[i].url, {"waitUntil" : "load"});
         html = await page.content();
       } catch(e) {
         console.log('scrapeListings for loop upper', e);
-        await page.waitForTimeout(120000);
+        console.log('url', listings[i].url);
+        await page.waitForTimeout(3000);
         await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"] });
+        await page.goto(listings[i].url, {"waitUntil" : "load"});
       }
 
       const $ = cheerio.load(html);
@@ -332,11 +373,16 @@ const zoopla = {
       const title = $(
         '#listing-summary-details-heading > div:first-child',
       ).text();
-      const address = $("address[data-testid='address-label']").text();
+     // const address = $("address[data-testid='address-label']").text();
+      let address = "";
+      let postCode = "";
       let groundRent = null;
       let pictures = [];
 
       if (serviceCharge) {
+        const addressData = await zoopla.findAddress($);
+        address = addressData.address || "";
+        postCode = addressData.postCode || "";
         groundRent = await this.findGroundRent($);
         pictures = await this.savePictures($);
         serviceCharge = serviceCharge > 40 ? serviceCharge : null;
@@ -345,11 +391,13 @@ const zoopla = {
       listings[i].listingPrice = parseInt(listingPrice);
       listings[i].title = title;
       listings[i].address = address;
+      listings[i].postCode = postCode;
       listings[i].serviceCharge = serviceCharge;
       listings[i].groundRent = groundRent;
       listings[i].pictures = JSON.stringify(pictures);
+      listings[i].type = "flat";
 
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(1000);
 
       if (i === listings.length - 1) {
         return listings.filter(
@@ -455,67 +503,74 @@ const zoopla = {
       return [];
     }
 
-    $("li.splide__slide:not(.splide__slide--clone)").each(async (i, el) => {
+    // $("li.splide__slide:not(.splide__slide--clone)").each(async (i, el) => {
     
-      const srcset =  $(el).find('picture source').attr('srcset').split(',');
-      const small = srcset
-      .find((img) => img.includes('480w'))
-      .replace(':p 480w', '')
-      .trim();
-      
-      const medium = srcset
-      .find((img) => img.includes('768w'))
-      .replace(':p 768w', '')
-      .trim();
-      const large = srcset
-      .find((img) => img.includes('1200w'))
-      .replace(':p 1200w', '')
-      .trim();
+    //   const srcset =  $(el).find('picture source').attr('srcset');
+    //   console.log('srcset', srcset);
 
-      urls.push({ small, medium, large });    
-    });
+    //   if (srcset) {
+    //     const small = srcset
+    //     .split(',')
+    //     .find((img) => img.includes('480w'))
+    //     .replace(':p 480w', '')
+    //     .trim();
+        
+    //     const medium = srcset
+    //     .split(',')
+    //     .find((img) => img.includes('768w'))
+    //     .replace(':p 768w', '')
+    //     .trim();
+    //     const large = srcset
+    //     .split(',')
+    //     .find((img) => img.includes('1200w'))
+    //     .replace(':p 1200w', '')
+    //     .trim();
+
+    //     urls.push({ small, medium, large });  
+    //   }
+  
+    // });
+
+
+    for (var i = 0; i < $("li.splide__slide:not(.splide__slide--clone)").length; i++) {
+      const srcset = await page.$$eval(
+        "li.splide__slide.is-visible picture source",
+        (pic) => {
+          return pic.map((i) => i.srcset);
+        },
+      );
+      const srcsetArr = srcset[0].split(',');
+
+      const small = srcsetArr
+        .find((img) => img.includes('480w'))
+        .replace(' 480w', '');
+      const medium = srcsetArr
+        .find((img) => img.includes('768w'))
+        .replace(' 768w', '');
+      const large = srcsetArr
+        .find((img) => img.includes('1200w'))
+        .replace(' 1200w', '');
+
+      urls.push({ small, medium, large });
+
+      try {
+        await page.waitForSelector(
+          ".splide__arrow--next button",
+        );
+        // await page.click(
+        //   ".splide__arrow--next button",
+        // );
+        await page.evaluate(()=>document.querySelector('.splide__arrow--next button').click());
+
+
+        await page.waitForTimeout(700);
+      } catch (e) {
+        console.log('arrow_right selector errror', e);
+        break;
+      }
+    }
 
     return urls;
-
-    // for (var i = 0; i < $("li.splide__slide:not(.splide__slide--clone)").length; i++) {
-    //   const srcset = await page.$$eval(
-    //     "li.splide__slide:not(.splide__slide--clone) picture source",
-    //     (pic) => {
-    //       return pic.map((i) => i.srcset);
-    //     },
-    //   );
-    //   const srcsetArr = srcset[0].split(',');
-
-    //   const small = srcsetArr
-    //     .find((img) => img.includes('480w'))
-    //     .replace(':p 480w', '');
-    //   const medium = srcsetArr
-    //     .find((img) => img.includes('768w'))
-    //     .replace(':p 768w', '');
-    //   const large = srcsetArr
-    //     .find((img) => img.includes('1200w'))
-    //     .replace(':p 1200w', '');
-
-    //   urls.push({ small, medium, large });
-
-    //   try {
-    //     await page.waitForSelector(
-    //       "div.splide__arrow--next button",
-    //       {
-    //         timeout: 5000,
-    //       }
-    //     );
-    //     await page.click(
-    //       "div.splide__arrow--next button",
-    //     );
-    //     await page.waitForTimeout(1000);
-    //   } catch (e) {
-    //     console.log('arrow_right selector errror', e);
-    //     break;
-    //   }
-    // }
-
-    
   },
 
   extractNumberFromText: (el, str) => {
@@ -550,11 +605,53 @@ const zoopla = {
     return extractNumber;
   },
 
+  findAddress: async ($) => {
+    try {
+      await page.waitForSelector(
+        "img[data-testid='static-google-map",
+      );
+    } catch(e) {
+      console.log('Error findAddress');
+    }
+
+    const src = $("img[data-testid='static-google-map']").attr('src');
+    const urlParams = new URLSearchParams(src);
+    const coordinates = urlParams.get('center');
+    //51.544505,-0.110049
+    const res = await fetch(`https://dev.virtualearth.net/REST/v1/Locations/${coordinates}?key=${process.env.BING_API_KEY}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if(data.resourceSets.length) {
+          return { 
+            address: data.resourceSets[0]?.resources[0]?.name,
+            postCode: data.resourceSets[0]?.resources[0]?.address.postalCode
+          };
+        } else {
+          console.log('!');
+          return {
+            address: $("address[data-testid='address-label']").text(),
+            postCode: ""
+          };
+        }
+      })
+      .catch(e => {
+        console.log('Error bing api reguest', e);
+      });
+
+      return res;
+  },
+
   saveToDb: async function (listings = []) {
     for (var i = 0; i < listings.length; i++) {
-      await prisma.listing.create({
-        data: listings[i],
-      });
+
+      try {
+        await prisma.listing.create({
+          data: listings[i],
+        });
+      } catch(e) {
+        console.log('Error saving to db', e);
+      }
+
     }
     console.log('Listings saved to db');
   },

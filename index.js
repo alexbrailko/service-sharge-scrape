@@ -2,6 +2,10 @@ const zoopla = require('./zoopla.js');
 const cron = require('node-cron');
  const puppeteer = require('puppeteer');
  const cheerio = require('cheerio');
+
+
+
+
 // const Prisma = require("@prisma/client");
 
 // (async () => {
@@ -29,61 +33,55 @@ const cron = require('node-cron');
 // const test = async () => {
 //   console.log('1');
 //   const browser = await puppeteer.launch({
-//     headless: true,
+//     headless: false,
 //     ignoreDefaultArgs: ["--enable-automation"],
 //     args: ["--no-sandbox", "--disabled-setupid-sandbox"],
 //   });
 //   console.log('2');
 
 //   const page = await browser.newPage();
-//   await page.goto("https://www.zoopla.co.uk/for-sale/details/62134222/?search_identifier=056afce560195e0740ed055a5235a6de");
+//   await page.goto("https://www.zoopla.co.uk/for-sale/details/63825058/?search_identifier=f5a594495aa65465a149eafb9709307d");
 //   console.log('3');
 
 //   const html = await page.content();
 //   const $ = cheerio.load(html);
 //   console.log('4');
 
-//   try {
-//     const elementHandle = await page.waitForSelector('#gdpr-consent-notice');
-//     await page.waitForTimeout(2000);
-//     const frame = await elementHandle.contentFrame();
-//     await frame.waitForSelector('button#manageSettings');
-//     await frame.click('button#manageSettings');
-//     await frame.waitForSelector('button#saveAndExit');
-//     await page.waitForTimeout(300);
-//     await frame.click('button#saveAndExit');
-//   } catch(e) {
-//     console.log('Error agreeOnTeerms', e);
-//   }
+//   await zoopla.agreeOnTerms(page);
 //   console.log('5');
+//  // await page.waitForSelector("div[data-testid^='static-map-container']");
+//   // const res = await zoopla.findServiceCharge($, page);
+//   // console.log('res', res);
+//   // const res2 = await zoopla.findGroundRent($, page);
+//   // console.log('res2', res2);
 
-//   const res = await zoopla.findServiceCharge($, page);
-//   console.log('res', res);
-//   const res2 = await zoopla.findGroundRent($, page);
-//   console.log('res2', res2);
+ 
+//    const res = await zoopla.findAddress($);
+//    console.log('res', res);
+
+   
 //   await browser.close();
 // }
 
 // every 2 days '0 0 */2 * *'
-
 cron.schedule('0 0 */2 * *', async function() {
-  var date = new Date();
-  console.log('STARTED AT', date.toGMTString());
   await zoopla.initialize();
   await zoopla.agreeOnTerms();
   await zoopla.preparePages();
-  await zoopla.removeDuplicates();
-  await zoopla.removeOldListings();
+ // await zoopla.scrapeEachPage(a);
+ //await zoopla.scrapeListings([{"url": "https://www.zoopla.co.uk/for-sale/details/63896815/?search_identifier=da2ca34e73ad9a0f59e639a14822091a"}]);
   await zoopla.close();
   console.log('FINISHED AT', date.toGMTString());
 }, {
   runOnInit: true
 });
 
+// * * * * *   running a task every minute
 
-
-// cron.schedule('* * * * *', async () => {
+// cron.schedule('0 0 */2 * *', async () => {
 //   console.log('running a task every minute');
 //   await test();
 //   console.log('finish');
+// }, {
+//   runOnInit: true
 // });
