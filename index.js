@@ -1,10 +1,5 @@
 const zoopla = require('./zoopla.js');
 const cron = require('node-cron');
- const puppeteer = require('puppeteer');
- const cheerio = require('cheerio');
-
-
-
 
 // const Prisma = require("@prisma/client");
 
@@ -30,44 +25,10 @@ const cron = require('node-cron');
 //})();
 
 
-const test = async () => {
-  console.log('1');
-  const browser = await puppeteer.launch({
-    headless: false,
-    ignoreDefaultArgs: ["--enable-automation"],
-    args: ["--no-sandbox", "--disabled-setupid-sandbox"],
-  });
-  console.log('2');
-
-  const page = await browser.newPage();
-  await page.goto("https://www.zoopla.co.uk/for-sale/details/62644729/?search_identifier=1355199465798b5da6f8ea8cb2fe43e3e9de221b97ecb9fa36e16b35d1b22ff2");
-  console.log('3');
-
-  const html = await page.content();
-  const $ = cheerio.load(html);
-  console.log('4');
-
-  // await zoopla.agreeOnTerms(page);
-  // console.log('5');
- // await page.waitForSelector("div[data-testid^='static-map-container']");
-  const res = await zoopla.savePictures($, page);
-  console.log('res', res);
-  // const res2 = await zoopla.findGroundRent($, page);
-  // console.log('res2', res2);
-
- 
-  //  const res = await zoopla.findAddress($);
-  //  console.log('res', res);
-
-   
-  await browser.close();
-}
-
-
-
 // every 2 days '0 0 */2 * *'
 cron.schedule('0 0 */2 * *', async function() {
   await zoopla.initialize();
+  //await zoopla.removeDuplicates();
   await zoopla.agreeOnTerms();
   await zoopla.preparePages();
   await zoopla.close();

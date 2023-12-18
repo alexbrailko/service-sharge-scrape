@@ -30,7 +30,7 @@ let finishScraping = false;
 let latestPostDate = null;
 
 const puppeteerArgs = {
-  headless: true,
+  headless: false,
   // ignoreDefaultArgs: ['--enable-automation'],
   ignoreHTTPSErrors: true,
   slowMo: 0,
@@ -422,17 +422,20 @@ const zoopla = {
     }
   },
 
-  findServiceCharge: async function ($) {
+  findServiceCharge: async function ($, page) {
     const text = 'service charge';
 
     const serviceChargeElem = $(
       "section[aria-labelledby='listing-gallery-heading']"
-    ).next().next().find('div._1k66bqh0')
-    .filter(function() {
-      return $(this).text().indexOf('Service charge:') > -1;
-    });
+    ).next().next()
+    .find('div:contains("Service charge:")')
+    // .filter(function() {
+    //   return $(this).text().indexOf('Service charge:') > -1;
+    // })
+    //.next().text();
 
     const serviceChargeText = $(serviceChargeElem).next().text();
+
     let serviceChargeAmount = null;
 
     if (serviceChargeText.includes('month')) {
@@ -599,19 +602,18 @@ const zoopla = {
 
     if (index > 20) return null;
     if (
-      cutText.substr(0, 25).search(/(n\/a)/) > -1 ||
-      cutText.substr(0, 25).includes('tbc')
+      cutText.substr(0, 30).search(/(n\/a)/) > -1 ||
+      cutText.substr(0, 30).includes('tbc')
     ) {
       return null;
     }
 
-    const newText = cutText.substring(index).substr(0, 25);
+    const newText = cutText.substring(index).substr(0, 30);
     const extractNumber = helpers.extractNumberFromString(newText);
-    // str.search(/\per month\b/)
 
     if (
       newText.includes('pm') ||
-      newText.includes('per month') ||
+      newText.includes('month') ||
       newText.includes('pcm')
     ) {
       return extractNumber * 12;
