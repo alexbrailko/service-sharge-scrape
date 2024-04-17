@@ -1,0 +1,40 @@
+{
+  "_name_or_path": "google/vit-base-patch16-224-in21k",
+  "architectures": ["ViTForImageClassification"],
+  "attention_probs_dropout_prob": 0.0,
+  "encoder_stride": 16,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.0,
+  "hidden_size": 768,
+  "id2label": {
+    "0": "bathroom",
+    "1": "bedroom",
+    "2": "dining room",
+    "3": "house facade",
+    "4": "kitchen",
+    "5": "living room",
+    "6": "sao paulo apartment facade"
+  },
+  "image_size": 224,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "label2id": {
+    "bathroom": "0",
+    "bedroom": "1",
+    "dining room": "2",
+    "house facade": "3",
+    "kitchen": "4",
+    "living room": "5",
+    "sao paulo apartment facade": "6"
+  },
+  "layer_norm_eps": 1e-12,
+  "model_type": "vit",
+  "num_attention_heads": 12,
+  "num_channels": 3,
+  "num_hidden_layers": 12,
+  "patch_size": 16,
+  "problem_type": "single_label_classification",
+  "qkv_bias": true,
+  "torch_dtype": "float32",
+  "transformers_version": "4.22.2"
+}

@@ -19,7 +19,7 @@ const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
 const BASE_URL = 'https://www.zoopla.co.uk';
-const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&price_min=550000&price_max=599999&pn=31';
+const CURRENT_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&price_min=50000&price_max=100000&pn=1';
 
 
 
@@ -30,7 +30,7 @@ let finishScraping = false;
 let latestPostDate = null;
 
 const puppeteerArgs = {
-  headless: false,
+  headless: true,
   // ignoreDefaultArgs: ['--enable-automation'],
   ignoreHTTPSErrors: true,
   slowMo: 0,
@@ -61,24 +61,11 @@ const zoopla = {
     console.log('launch');
 
     page = await browser.newPage();
-    //await page.setViewport({ width: 1920, height: 1080 });
-
-    // await page.setRequestInterception(true);
-    // const block_ressources = ['image', 'stylesheet', 'media', 'font', 'texttrack', 'object', 'beacon', 'csp_report', 'imageset'];
-    // page.on('request', request => {
-    //   if (block_ressources.indexOf(request.resourceType) > 0)
-    //     request.abort();
-    //   else
-    //     request.continue();
-    // });
-
-    
+    await page.setViewport({ width: 1920, height: 1080 });
 
     await page.goto(BASE_URL, {
       waitUntil: "networkidle2"
     });
-    //await zoopla.agreeOnTerms();
-    // return page;
   },
 
   close: async () => {
@@ -394,9 +381,11 @@ const zoopla = {
         address = addressData.address || "";
         addressFull = addressData.addressFull || "";
         postCode = addressData.postCode || "";
-        coordinates = addressData.coordinates || "";
+        const coordsNew = await zoopla.modifyCoordinates(addressFull);
+        coordinates = coordsNew ? coordsNew : addressData.coordinates;
         groundRent = await this.findGroundRent($);
-        pictures = await this.savePictures($);
+         await this.findBingPictures($);
+        //pictures = await this.savePictures($);
         serviceCharge = serviceCharge > 40 ? serviceCharge : null;
       }
 
@@ -408,7 +397,7 @@ const zoopla = {
       listings[i].coordinates = coordinates;
       listings[i].serviceCharge = serviceCharge;
       listings[i].groundRent = groundRent;
-      listings[i].pictures = JSON.stringify(pictures);
+      //listings[i].pictures = JSON.stringify(pictures);
       listings[i].type = "flat";
 
       await page.waitForTimeout(1000);
@@ -516,6 +505,10 @@ const zoopla = {
     }
   },
 
+  findBingPictures: async function() {
+    
+  },
+
   savePictures: async function ($) {
     const urls = [];
 
@@ -527,35 +520,6 @@ const zoopla = {
       console.log('gallery image', e);
       return [];
     }
-
-    // $("li.splide__slide:not(.splide__slide--clone)").each(async (i, el) => {
-    
-    //   const srcset =  $(el).find('picture source').attr('srcset');
-    //   console.log('srcset', srcset);
-
-    //   if (srcset) {
-    //     const small = srcset
-    //     .split(',')
-    //     .find((img) => img.includes('480w'))
-    //     .replace(':p 480w', '')
-    //     .trim();
-        
-    //     const medium = srcset
-    //     .split(',')
-    //     .find((img) => img.includes('768w'))
-    //     .replace(':p 768w', '')
-    //     .trim();
-    //     const large = srcset
-    //     .split(',')
-    //     .find((img) => img.includes('1200w'))
-    //     .replace(':p 1200w', '')
-    //     .trim();
-
-    //     urls.push({ small, medium, large });  
-    //   }
-  
-    // });
-
 
     for (var i = 0; i < $("li.splide__slide:not(.splide__slide--clone)").length; i++) {
       const srcsetArr = await page.$$eval(
@@ -640,7 +604,8 @@ const zoopla = {
     const coordinates = urlParams.get('center');
     const address = $("address[data-testid='address-label']").text();
     //51.544505,-0.110049
-    const res = await fetch(`https://dev.virtualearth.net/REST/v1/Locations/${coordinates}?key=${process.env.BING_API_KEY}`)
+    https://dev.virtualearth.net/REST/v1/Locations?query=${encodedAddress}&key=${process.env.BING_API_KEY}
+    var res = await fetch(`https://dev.virtualearth.net/REST/v1/Locations/${coordinates}?key=${process.env.BING_API_KEY}`)
       .then((response) => response.json())
       .then((data) => {
         if(data.resourceSets.length) {
@@ -672,12 +637,16 @@ const zoopla = {
   },
 
   saveToDb: async function (listings = []) {
+    console.log('SAVING TO DB', listings);
     for (var i = 0; i < listings.length; i++) {
 
       try {
         await prisma.listing.create({
           data: listings[i],
         });
+        
+        break;
+
       } catch(e) {
         console.log('Error saving to db', e);
       }
@@ -725,7 +694,45 @@ const zoopla = {
       }
     });
 
-  }
+  },
+  modifyCoordinates: async (address) => {
+    //get more precise coordinates of house location
+    try {
+      // Encode the address string
+      const encodedAddress = encodeURIComponent(address);
+
+      // Construct the URL for the Geocoding API
+      const url = `https://dev.virtualearth.net/REST/v1/Locations?query=${encodedAddress}&key=${process.env.BING_API_KEY}`;
+
+      // Make the HTTP request
+      const response = await fetch(url);
+
+      // Check if the response is successful
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      // Parse the JSON response
+      const data = await response.json();
+
+      // Extract latitude and longitude from the response
+      if (
+        data.resourceSets &&
+        data.resourceSets.length > 0 &&
+        data.resourceSets[0].resources.length > 0
+      ) {
+        const coordinates = data.resourceSets[0].resources[0].point.coordinates;
+        const latitude = coordinates[0];
+        const longitude = coordinates[1];
+
+        return latitude + ',' + longitude;
+      } else {
+        console.log('No results found for the provided address.');
+      }
+    } catch (error) {
+      console.error('There was a problem with the fetch operation:', error);
+    }
+  },
 };
 
 module.exports = zoopla;

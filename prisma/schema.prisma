@@ -26,6 +26,7 @@ model Listing {
   postCode      String
   coordinates   String?
   serviceCharge Int
+  serviceChargeHistory String ?      @db.LongText
   groundRent    Int?
   pictures      String       @db.LongText
 }
