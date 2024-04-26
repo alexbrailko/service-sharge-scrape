@@ -16,12 +16,13 @@ model Listing {
   url           String
   type          String
   datePosted    DateTime
+  scrapedAt     DateTime?    
   title         String
   listingPrice  Int
   beds          Int?
   baths         Int?
   area          Int?   // square feet
-  address       String
+  address       String  // equals address_line2
   addressFull   String
   postCode      String
   coordinates   String?

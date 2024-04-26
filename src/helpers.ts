@@ -1,10 +1,10 @@
 import moment from 'moment';
 
-function numberWithCommas(x) {
+export function numberWithCommas(x) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-function extractNumberFromString(string) {
+export function extractNumberFromString(string) {
   const str = string.match(/\d+\,\d+|\d+\b|\d+(?=\w)/g);
   if (!str) return null;
   const removeCommas = str[0].replaceAll(',', '');
@@ -12,14 +12,14 @@ function extractNumberFromString(string) {
   return parseInt(removeCommas);
 }
 
-function findMatchedElement($, selector, matcher) {
+export function findMatchedElement($, selector, matcher) {
   return $(selector).filter(function () {
     const reg = new RegExp(matcher, 'ig');
     return reg.test($(this).text());
   });
 }
 
-function isBeforeToday(date) {
+export function isBeforeToday(date) {
   const today = new Date();
 
   today.setHours(0, 0, 0, 0);
@@ -27,14 +27,14 @@ function isBeforeToday(date) {
   return date < today;
 }
 
-function moreThanXHoursAgo(date, hours = 1) {
+export function moreThanXHoursAgo(date, hours = 1) {
   const HOURS = 1000 * 60 * (60 * hours);
   const hoursAgo = Date.now() - HOURS;
 
   return date < hoursAgo;
 }
 
-function updateURLParameter(url, param, paramVal) {
+export function updateURLParameter(url, param, paramVal) {
   var newAdditionalURL = '';
   var tempArray = url.split('?');
   var baseURL = tempArray[0];
@@ -54,7 +54,7 @@ function updateURLParameter(url, param, paramVal) {
   return baseURL + '?' + newAdditionalURL + rows_txt;
 }
 
-const incrementPrice = (price: number, isMax?: boolean) => {
+export const incrementPrice = (price: number, isMax?: boolean) => {
   let newPrice = price;
   //let maxPrice = newPrice;
 
@@ -65,8 +65,10 @@ const incrementPrice = (price: number, isMax?: boolean) => {
 
   if (newPrice < 1000000) {
     newPrice = newPrice + 50000;
-  } else if (newPrice >= 1000000) {
+  } else if (newPrice >= 1000000 && newPrice < 3000000) {
     newPrice = newPrice + 100000;
+  } else {
+    newPrice = newPrice + 500000;
   }
 
   if (isMax) {
@@ -76,7 +78,7 @@ const incrementPrice = (price: number, isMax?: boolean) => {
   return newPrice;
 };
 
-const extractNumberFromText = (el, str): number => {
+export const extractNumberFromText = (el, str): number => {
   const elem = el.text().toLowerCase();
   const cutText = elem.substr(elem.indexOf(str) + str.length);
   const index = cutText.indexOf('£');
@@ -90,7 +92,7 @@ const extractNumberFromText = (el, str): number => {
   }
 
   const newText = cutText.substring(index).substr(0, 30);
-  const extractNumber = helpers.extractNumberFromString(newText);
+  const extractNumber = extractNumberFromString(newText);
 
   if (
     newText.includes('pm') ||
@@ -107,26 +109,32 @@ const extractNumberFromText = (el, str): number => {
   return extractNumber;
 };
 
-async function delay() {
+export async function delay() {
   const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
   return await new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-function compareNumberDifference(
-  previousValue: number,
-  currentValue: number,
-  diffNumber: number = 50
+export function numberDifferencePercentage(
+  num1: number,
+  num2: number,
+  percent: number = 5
 ) {
-  if (previousValue === undefined) {
-    // No previous value, return false
+  // Handle division by zero
+  if (num2 === 0) {
     return false;
   }
 
-  const difference = Math.abs(currentValue - previousValue);
-  return difference >= diffNumber;
+  // Calculate the absolute difference
+  const difference = Math.abs(num1 - num2);
+
+  // Calculate the percentage difference
+  const percentageDifference = (difference / Math.abs(num2)) * 100;
+
+  // Check if difference is more than 5%
+  return percentageDifference > percent;
 }
 
-function isNMonthsApart(date1: Date, date2: Date, months: number = 3) {
+export function isNMonthsApart(date1: Date, date2: Date, months: number = 3) {
   const moment1 = moment(date1);
   const moment2 = moment(date2);
 
@@ -136,17 +144,3 @@ function isNMonthsApart(date1: Date, date2: Date, months: number = 3) {
   // Check if the difference is greater than or equal to 3 months
   return monthsDiff >= months;
 }
-
-export const helpers = {
-  numberWithCommas,
-  extractNumberFromString,
-  findMatchedElement,
-  isBeforeToday,
-  updateURLParameter,
-  moreThanXHoursAgo,
-  incrementPrice,
-  extractNumberFromText,
-  compareNumberDifference,
-  delay,
-  isNMonthsApart,
-};

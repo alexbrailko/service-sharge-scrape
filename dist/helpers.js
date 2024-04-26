@@ -3,11 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.helpers = void 0;
+exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
 const moment_1 = __importDefault(require("moment"));
 function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
+exports.numberWithCommas = numberWithCommas;
 function extractNumberFromString(string) {
     const str = string.match(/\d+\,\d+|\d+\b|\d+(?=\w)/g);
     if (!str)
@@ -15,22 +16,26 @@ function extractNumberFromString(string) {
     const removeCommas = str[0].replaceAll(',', '');
     return parseInt(removeCommas);
 }
+exports.extractNumberFromString = extractNumberFromString;
 function findMatchedElement($, selector, matcher) {
     return $(selector).filter(function () {
         const reg = new RegExp(matcher, 'ig');
         return reg.test($(this).text());
     });
 }
+exports.findMatchedElement = findMatchedElement;
 function isBeforeToday(date) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return date < today;
 }
+exports.isBeforeToday = isBeforeToday;
 function moreThanXHoursAgo(date, hours = 1) {
     const HOURS = 1000 * 60 * (60 * hours);
     const hoursAgo = Date.now() - HOURS;
     return date < hoursAgo;
 }
+exports.moreThanXHoursAgo = moreThanXHoursAgo;
 function updateURLParameter(url, param, paramVal) {
     var newAdditionalURL = '';
     var tempArray = url.split('?');
@@ -49,6 +54,7 @@ function updateURLParameter(url, param, paramVal) {
     var rows_txt = temp + '' + param + '=' + paramVal;
     return baseURL + '?' + newAdditionalURL + rows_txt;
 }
+exports.updateURLParameter = updateURLParameter;
 const incrementPrice = (price, isMax) => {
     let newPrice = price;
     //let maxPrice = newPrice;
@@ -56,13 +62,13 @@ const incrementPrice = (price, isMax) => {
         newPrice++;
         // console.log('maxPrice1', maxPrice);
     }
-    if (newPrice < 800000) {
+    if (newPrice < 1000000) {
         newPrice = newPrice + 50000;
     }
-    else if (newPrice >= 800000 && newPrice < 1000000) {
+    else if (newPrice >= 1000000 && newPrice < 3000000) {
         newPrice = newPrice + 100000;
     }
-    else if (newPrice >= 1000000) {
+    else {
         newPrice = newPrice + 500000;
     }
     if (isMax) {
@@ -70,6 +76,7 @@ const incrementPrice = (price, isMax) => {
     }
     return newPrice;
 };
+exports.incrementPrice = incrementPrice;
 const extractNumberFromText = (el, str) => {
     const elem = el.text().toLowerCase();
     const cutText = elem.substr(elem.indexOf(str) + str.length);
@@ -81,7 +88,7 @@ const extractNumberFromText = (el, str) => {
         return null;
     }
     const newText = cutText.substring(index).substr(0, 30);
-    const extractNumber = exports.helpers.extractNumberFromString(newText);
+    const extractNumber = extractNumberFromString(newText);
     if (newText.includes('pm') ||
         newText.includes('month') ||
         newText.includes('pcm')) {
@@ -92,18 +99,25 @@ const extractNumberFromText = (el, str) => {
     }
     return extractNumber;
 };
+exports.extractNumberFromText = extractNumberFromText;
 async function delay() {
     const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
     return await new Promise((resolve) => setTimeout(resolve, delay));
 }
-function compareNumberDifference(previousValue, currentValue, diffNumber = 50) {
-    if (previousValue === undefined) {
-        // No previous value, return false
+exports.delay = delay;
+function numberDifferencePercentage(num1, num2, percent = 5) {
+    // Handle division by zero
+    if (num2 === 0) {
         return false;
     }
-    const difference = Math.abs(currentValue - previousValue);
-    return difference >= diffNumber;
+    // Calculate the absolute difference
+    const difference = Math.abs(num1 - num2);
+    // Calculate the percentage difference
+    const percentageDifference = (difference / Math.abs(num2)) * 100;
+    // Check if difference is more than 5%
+    return percentageDifference > percent;
 }
+exports.numberDifferencePercentage = numberDifferencePercentage;
 function isNMonthsApart(date1, date2, months = 3) {
     const moment1 = (0, moment_1.default)(date1);
     const moment2 = (0, moment_1.default)(date2);
@@ -112,17 +126,5 @@ function isNMonthsApart(date1, date2, months = 3) {
     // Check if the difference is greater than or equal to 3 months
     return monthsDiff >= months;
 }
-exports.helpers = {
-    numberWithCommas,
-    extractNumberFromString,
-    findMatchedElement,
-    isBeforeToday,
-    updateURLParameter,
-    moreThanXHoursAgo,
-    incrementPrice,
-    extractNumberFromText,
-    compareNumberDifference,
-    delay,
-    isNMonthsApart,
-};
+exports.isNMonthsApart = isNMonthsApart;
 //# sourceMappingURL=helpers.js.map
