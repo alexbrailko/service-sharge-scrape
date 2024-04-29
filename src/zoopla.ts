@@ -96,7 +96,7 @@ export const preparePages = async (
 ) => {
   let newUrl = firstUrl;
 
-  for (let index = 0; index < 43; index++) {
+  for (let index = 0; index < 70; index++) {
     const url = new URL(newUrl);
     const search_params = url.searchParams;
     const priceMin = parseInt(search_params.get('price_min'));
@@ -127,7 +127,7 @@ export const preparePages = async (
   }
 
   //finish scraping
-  deleteScrapedDataFile();
+  clearScrapedDataFile();
 };
 
 export const scrapeEachPage = async (
@@ -165,10 +165,10 @@ export const scrapeEachPage = async (
       });
     } catch (e) {
       console.log('Error regular-listings', e);
-
+      break;
       //throw new Error('Failed to load regular-listings');
       //await browser.close();
-      finishCurrentUrl = true;
+      //finishCurrentUrl = true;
       // break;
     }
 
@@ -193,7 +193,17 @@ export const scrapeEachPage = async (
       page
     );
 
-    const listings = await scrapeListings(listingsList, page);
+    if (!listingsList.length) {
+      break;
+    }
+
+    let listings: ListingNoId[] = [];
+
+    try {
+      listings = await scrapeListings(listingsList, page);
+    } catch (e) {
+      console.log('Error scrapeListings', e);
+    }
 
     listingsData.push.apply(listingsData, listings);
     // remove duplicates from listings
@@ -307,6 +317,13 @@ export const scrapeListingsList = async (
       if (propertyOfTheWeek.length) {
         return null;
       }
+
+      const highlighted = $(element).find("div:contains('Highlight')");
+
+      if (highlighted.length) {
+        return null;
+      }
+
       // if (moment(datePosted) <= moment(latestPostDate)) {
       //   finishCurrentUrl = true;
       // }
@@ -333,9 +350,8 @@ export const scrapeListingsList = async (
 
   if (filteredByDate.length > 2) {
     finishCurrentUrl = true;
-  }
-
-  if (finishCurrentUrl) {
+    return [];
+  } else if (filteredByDate.length && filteredByDate.length <= 2) {
     return listings.filter(
       (listing) => moment(listing.datePosted) > moment(latestPostDate)
     );
@@ -350,7 +366,7 @@ export const scrapeListings = async (
 ): Promise<ListingNoId[]> => {
   if (!listings.length) return [];
 
-  const listingsData: any[] = listings;
+  const listingsData: ListingNoId[] = [];
 
   for (var i = 0; i < listings.length; i++) {
     let html;
@@ -360,7 +376,6 @@ export const scrapeListings = async (
       html = await page.content();
     } catch (e) {
       console.log('Error: scrapeListings for loop', e);
-      console.log('url', listings[i].url);
       await delay();
       await delay();
       await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
@@ -400,14 +415,13 @@ export const scrapeListings = async (
       try {
         const addressData = await getAddressData(coordinates);
         if (!addressData) {
-          listingsData.splice(i, 1); // 2nd parameter means remove one item only
+          continue;
         } else {
           addressFull = addressData.addressFull;
           postCode = addressData.postCode;
         }
       } catch (e) {
         console.log('Error getAddressData', e);
-        listingsData.splice(i, 1);
         continue;
       }
 
@@ -419,22 +433,27 @@ export const scrapeListings = async (
       serviceCharge = serviceCharge > 40 ? serviceCharge : null;
     }
 
-    listingsData[i].url = listings[i].url;
-    listingsData[i].type = 'flat';
-    listingsData[i].datePosted = listings[i].datePosted;
-    listingsData[i].scrapedAt = new Date();
-    listingsData[i].title = title;
-    listingsData[i].listingPrice = listingPrice;
-    listingsData[i].beds = listings[i].beds;
-    listingsData[i].baths = listings[i].baths;
-    listingsData[i].area = listings[i].area;
-    listingsData[i].address = address;
-    listingsData[i].addressFull = addressFull;
-    listingsData[i].postCode = postCode;
-    listingsData[i].coordinates = coordinates;
-    listingsData[i].serviceCharge = serviceCharge;
-    listingsData[i].groundRent = groundRent;
-    listingsData[i].pictures = '';
+    const listingData: ListingNoId = {
+      url: listings[i]?.url,
+      type: 'flat',
+      datePosted: listings[i].datePosted,
+      scrapedAt: new Date(),
+      title,
+      listingPrice,
+      beds: listings[i].beds,
+      baths: listings[i].baths,
+      area: listings[i].area,
+      address,
+      addressFull,
+      postCode,
+      coordinates,
+      serviceCharge,
+      groundRent,
+      pictures: '',
+      serviceChargeHistory: '',
+    };
+
+    listingsData.push(listingData);
   }
 
   return listingsData.filter(
@@ -582,30 +601,33 @@ export const saveScrapedData = (url: string, latestPostDate: Date) => {
   }
 };
 
-export const readScrapedData = (): string => {
+export const readScrapedData = () => {
   const filePath = path.join('./src/', 'scrapeData.json');
+
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, '{}');
+  }
 
   try {
     const data = fs.readFileSync(filePath, 'utf8');
 
     if (data) {
       const parsedData = JSON.parse(data);
-      if (parsedData) {
-        latestPostDate = parsedData.latestPostDate || null;
-        return parsedData.url;
-      }
+
+      latestPostDate = parsedData.latestPostDate || null;
+      return parsedData.url;
     }
 
     return '';
   } catch (error) {
-    console.error(error);
+    console.error('Error readScrapedData', error);
     throw error;
   }
 };
 
-export const deleteScrapedDataFile = () => {
+export const clearScrapedDataFile = () => {
   const filePath = path.join('./src/', 'scrapeData.json');
-  fs.rmSync(filePath, {
-    force: true,
+  fs.writeFile(filePath, '', function () {
+    console.log('cleared scrapeData.json');
   });
 };

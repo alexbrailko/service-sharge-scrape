@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = exports.initBrowser = void 0;
+exports.clearScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = exports.initBrowser = void 0;
 const puppeteer_extra_1 = __importDefault(require("puppeteer-extra"));
 const puppeteer_extra_plugin_stealth_1 = __importDefault(require("puppeteer-extra-plugin-stealth"));
 const puppeteer_extra_plugin_adblocker_1 = __importDefault(require("puppeteer-extra-plugin-adblocker"));
@@ -113,7 +113,7 @@ const preparePages = async (firstUrl, prisma, page, browser) => {
         newUrl = (0, helpers_1.updateURLParameter)(newUrl, 'pn', 1);
     }
     //finish scraping
-    (0, exports.deleteScrapedDataFile)();
+    (0, exports.clearScrapedDataFile)();
 };
 exports.preparePages = preparePages;
 const scrapeEachPage = async (url, prisma, page, browser) => {
@@ -141,9 +141,10 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
         }
         catch (e) {
             console.log('Error regular-listings', e);
+            break;
             //throw new Error('Failed to load regular-listings');
             //await browser.close();
-            finishCurrentUrl = true;
+            //finishCurrentUrl = true;
             // break;
         }
         const url = new URL(mainUrl);
@@ -158,7 +159,16 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
         await (0, exports.getLatestScrapedPostDate)(prisma, priceMin, priceMax);
         (0, exports.saveScrapedData)(url, latestPostDate);
         const listingsList = await (0, exports.scrapeListingsList)(priceMin, priceMax, prisma, page);
-        const listings = await (0, exports.scrapeListings)(listingsList, page);
+        if (!listingsList.length) {
+            break;
+        }
+        let listings = [];
+        try {
+            listings = await (0, exports.scrapeListings)(listingsList, page);
+        }
+        catch (e) {
+            console.log('Error scrapeListings', e);
+        }
         listingsData.push.apply(listingsData, listings);
         // remove duplicates from listings
         if (listingsData.length) {
@@ -244,6 +254,10 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
         if (propertyOfTheWeek.length) {
             return null;
         }
+        const highlighted = $(element).find("div:contains('Highlight')");
+        if (highlighted.length) {
+            return null;
+        }
         // if (moment(datePosted) <= moment(latestPostDate)) {
         //   finishCurrentUrl = true;
         // }
@@ -265,8 +279,9 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
     const filteredByDate = listings.filter((obj) => (0, moment_1.default)(obj.datePosted) < (0, moment_1.default)(latestPostDate));
     if (filteredByDate.length > 2) {
         finishCurrentUrl = true;
+        return [];
     }
-    if (finishCurrentUrl) {
+    else if (filteredByDate.length && filteredByDate.length <= 2) {
         return listings.filter((listing) => (0, moment_1.default)(listing.datePosted) > (0, moment_1.default)(latestPostDate));
     }
     else {
@@ -277,7 +292,7 @@ exports.scrapeListingsList = scrapeListingsList;
 const scrapeListings = async (listings, page) => {
     if (!listings.length)
         return [];
-    const listingsData = listings;
+    const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         let html;
         try {
@@ -286,7 +301,6 @@ const scrapeListings = async (listings, page) => {
         }
         catch (e) {
             console.log('Error: scrapeListings for loop', e);
-            console.log('url', listings[i].url);
             await (0, helpers_1.delay)();
             await (0, helpers_1.delay)();
             await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
@@ -319,7 +333,7 @@ const scrapeListings = async (listings, page) => {
             try {
                 const addressData = await (0, api_1.getAddressData)(coordinates);
                 if (!addressData) {
-                    listingsData.splice(i, 1); // 2nd parameter means remove one item only
+                    continue;
                 }
                 else {
                     addressFull = addressData.addressFull;
@@ -328,7 +342,6 @@ const scrapeListings = async (listings, page) => {
             }
             catch (e) {
                 console.log('Error getAddressData', e);
-                listingsData.splice(i, 1);
                 continue;
             }
             if (!area) {
@@ -337,22 +350,26 @@ const scrapeListings = async (listings, page) => {
             groundRent = (0, findData_1.findGroundRent)($);
             serviceCharge = serviceCharge > 40 ? serviceCharge : null;
         }
-        listingsData[i].url = listings[i].url;
-        listingsData[i].type = 'flat';
-        listingsData[i].datePosted = listings[i].datePosted;
-        listingsData[i].scrapedAt = new Date();
-        listingsData[i].title = title;
-        listingsData[i].listingPrice = listingPrice;
-        listingsData[i].beds = listings[i].beds;
-        listingsData[i].baths = listings[i].baths;
-        listingsData[i].area = listings[i].area;
-        listingsData[i].address = address;
-        listingsData[i].addressFull = addressFull;
-        listingsData[i].postCode = postCode;
-        listingsData[i].coordinates = coordinates;
-        listingsData[i].serviceCharge = serviceCharge;
-        listingsData[i].groundRent = groundRent;
-        listingsData[i].pictures = '';
+        const listingData = {
+            url: listings[i]?.url,
+            type: 'flat',
+            datePosted: listings[i].datePosted,
+            scrapedAt: new Date(),
+            title,
+            listingPrice,
+            beds: listings[i].beds,
+            baths: listings[i].baths,
+            area: listings[i].area,
+            address,
+            addressFull,
+            postCode,
+            coordinates,
+            serviceCharge,
+            groundRent,
+            pictures: '',
+            serviceChargeHistory: '',
+        };
+        listingsData.push(listingData);
     }
     return listingsData.filter((listing) => listing.serviceCharge !== null && listing.serviceCharge !== 0);
 };
@@ -465,28 +482,29 @@ const saveScrapedData = (url, latestPostDate) => {
 exports.saveScrapedData = saveScrapedData;
 const readScrapedData = () => {
     const filePath = path_1.default.join('./src/', 'scrapeData.json');
+    if (!fs_1.default.existsSync(filePath)) {
+        fs_1.default.writeFileSync(filePath, '{}');
+    }
     try {
         const data = fs_1.default.readFileSync(filePath, 'utf8');
         if (data) {
             const parsedData = JSON.parse(data);
-            if (parsedData) {
-                latestPostDate = parsedData.latestPostDate || null;
-                return parsedData.url;
-            }
+            latestPostDate = parsedData.latestPostDate || null;
+            return parsedData.url;
         }
         return '';
     }
     catch (error) {
-        console.error(error);
+        console.error('Error readScrapedData', error);
         throw error;
     }
 };
 exports.readScrapedData = readScrapedData;
-const deleteScrapedDataFile = () => {
+const clearScrapedDataFile = () => {
     const filePath = path_1.default.join('./src/', 'scrapeData.json');
-    fs_1.default.rmSync(filePath, {
-        force: true,
+    fs_1.default.writeFile(filePath, '', function () {
+        console.log('cleared scrapeData.json');
     });
 };
-exports.deleteScrapedDataFile = deleteScrapedDataFile;
+exports.clearScrapedDataFile = clearScrapedDataFile;
 //# sourceMappingURL=zoopla.js.map

@@ -16,14 +16,12 @@ let retryCount = 0;
 (async () => {
   let browser: Browser;
   let page: Page;
-  const savedUrl = readScrapedData();
-  const url = savedUrl ? savedUrl : STARTING_URL;
 
   try {
     browser = await initBrowser();
     page = await browser.newPage();
 
-    await start(browser, page, url);
+    await start(browser, page);
   } catch (e) {
     await page.close();
     await browser.close();
@@ -31,12 +29,14 @@ let retryCount = 0;
 
     browser = await initBrowser();
     page = await browser.newPage();
-    await restart(browser, page, url);
+    await restart(browser, page);
   }
 })();
 
-const start = async (browser: Browser, page: Page, url: string) => {
+const start = async (browser: Browser, page: Page) => {
   const prisma = await connectPrisma();
+  const savedUrl = readScrapedData();
+  const url = savedUrl ? savedUrl : STARTING_URL;
 
   await page.goto(BASE_URL, {
     waitUntil: 'networkidle2',
@@ -49,7 +49,7 @@ const start = async (browser: Browser, page: Page, url: string) => {
   await prisma.$disconnect();
 };
 
-const restart = async (browser: Browser, page: Page, url: string) => {
+const restart = async (browser: Browser, page: Page) => {
   try {
     // Consider exponential backoff for repeated retries:
     const delay = Math.min(2 ** retryCount * 60000, 300000); // Up to 5 minutes
@@ -57,7 +57,7 @@ const restart = async (browser: Browser, page: Page, url: string) => {
     console.log(`Retrying after ${delay / 1000} seconds...`);
     await new Promise((resolve) => setTimeout(resolve, delay)); // Wait before restarting
 
-    await start(browser, page, url);
+    await start(browser, page);
   } catch (error) {
     console.error('Error during restart:', error.message);
     // Handle restart errors (optional)
