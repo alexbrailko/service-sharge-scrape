@@ -7,12 +7,10 @@ let retryCount = 0;
 (async () => {
     let browser;
     let page;
-    const savedUrl = (0, zoopla_1.readScrapedData)();
-    const url = savedUrl ? savedUrl : STARTING_URL;
     try {
         browser = await (0, zoopla_1.initBrowser)();
         page = await browser.newPage();
-        await start(browser, page, url);
+        await start(browser, page);
     }
     catch (e) {
         await page.close();
@@ -20,11 +18,13 @@ let retryCount = 0;
         console.error('EEE', e);
         browser = await (0, zoopla_1.initBrowser)();
         page = await browser.newPage();
-        await restart(browser, page, url);
+        await restart(browser, page);
     }
 })();
-const start = async (browser, page, url) => {
+const start = async (browser, page) => {
     const prisma = await (0, zoopla_1.connectPrisma)();
+    const savedUrl = (0, zoopla_1.readScrapedData)();
+    const url = savedUrl ? savedUrl : STARTING_URL;
     await page.goto(BASE_URL, {
         waitUntil: 'networkidle2',
     });
@@ -33,13 +33,13 @@ const start = async (browser, page, url) => {
     await browser.close();
     await prisma.$disconnect();
 };
-const restart = async (browser, page, url) => {
+const restart = async (browser, page) => {
     try {
         // Consider exponential backoff for repeated retries:
         const delay = Math.min(2 ** retryCount * 60000, 300000); // Up to 5 minutes
         console.log(`Retrying after ${delay / 1000} seconds...`);
         await new Promise((resolve) => setTimeout(resolve, delay)); // Wait before restarting
-        await start(browser, page, url);
+        await start(browser, page);
     }
     catch (error) {
         console.error('Error during restart:', error.message);

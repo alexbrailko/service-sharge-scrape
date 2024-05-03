@@ -96,7 +96,7 @@ const agreeOnTerms = async (page) => {
 exports.agreeOnTerms = agreeOnTerms;
 const preparePages = async (firstUrl, prisma, page, browser) => {
     let newUrl = firstUrl;
-    for (let index = 0; index < 43; index++) {
+    for (let index = 0; index < 70; index++) {
         const url = new URL(newUrl);
         const search_params = url.searchParams;
         const priceMin = parseInt(search_params.get('price_min'));
@@ -338,6 +338,7 @@ const scrapeListings = async (listings, page) => {
                 else {
                     addressFull = addressData.addressFull;
                     postCode = addressData.postCode;
+                    coordinates = addressData.coordinates;
                 }
             }
             catch (e) {
@@ -359,7 +360,7 @@ const scrapeListings = async (listings, page) => {
             listingPrice,
             beds: listings[i].beds,
             baths: listings[i].baths,
-            area: listings[i].area,
+            area: area,
             address,
             addressFull,
             postCode,

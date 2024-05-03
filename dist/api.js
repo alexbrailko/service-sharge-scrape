@@ -30,11 +30,11 @@ const getAddressDataGeoapify = async (coordinates) => {
                 (d.result_type === 'amenity' && notBuildingCategory)) {
                 return false;
             }
-            const newData = {
+            return {
                 addressFull: d.formatted || '',
                 postCode: d.postcode || '',
+                coordinates: `${d.lat},${d.lon}`,
             };
-            return newData;
         }
         else {
             return false;
@@ -58,6 +58,7 @@ const getAddressDataOpenStreetMap = async (coordinates) => {
             return {
                 addressFull: data.display_name,
                 postCode: data.address.postcode,
+                coordinates: `${data.lat},${data.lon}`,
             };
         }
         else {
@@ -108,9 +109,11 @@ const getAddressDataBing = async (coordinates) => {
         if (data.resourceSets.length &&
             data.resourceSets[0]?.resources[0]?.confidence === 'High') {
             const address = data.resourceSets[0]?.resources[0]?.address;
+            const coordsArr = data.resourceSets[0]?.resources[0].point.coordinates;
             return {
                 addressFull: address.formattedAddress,
                 postCode: address.postalCode,
+                coordinates: `${coordsArr[0]},${coordsArr[1]}`,
             };
         }
         else {

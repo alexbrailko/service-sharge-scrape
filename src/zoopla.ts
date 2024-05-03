@@ -419,6 +419,7 @@ export const scrapeListings = async (
         } else {
           addressFull = addressData.addressFull;
           postCode = addressData.postCode;
+          coordinates = addressData.coordinates;
         }
       } catch (e) {
         console.log('Error getAddressData', e);
@@ -442,7 +443,7 @@ export const scrapeListings = async (
       listingPrice,
       beds: listings[i].beds,
       baths: listings[i].baths,
-      area: listings[i].area,
+      area: area,
       address,
       addressFull,
       postCode,

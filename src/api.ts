@@ -1,6 +1,7 @@
 interface AddressData {
   addressFull: string;
   postCode: string;
+  coordinates: string;
 }
 
 export const getAddressData = async (coordinates: string) => {
@@ -45,12 +46,11 @@ export const getAddressDataGeoapify = async (
           return false;
         }
 
-        const newData = {
+        return {
           addressFull: d.formatted || '',
           postCode: d.postcode || '',
+          coordinates: `${d.lat},${d.lon}`,
         };
-
-        return newData;
       } else {
         return false;
       }
@@ -77,6 +77,7 @@ export const getAddressDataOpenStreetMap = async (
         return {
           addressFull: data.display_name,
           postCode: data.address.postcode,
+          coordinates: `${data.lat},${data.lon}`,
         };
       } else {
         return false;
@@ -141,10 +142,12 @@ export const getAddressDataBing = async (
         data.resourceSets[0]?.resources[0]?.confidence === 'High'
       ) {
         const address = data.resourceSets[0]?.resources[0]?.address;
+        const coordsArr = data.resourceSets[0]?.resources[0].point.coordinates;
 
         return {
           addressFull: address.formattedAddress,
           postCode: address.postalCode,
+          coordinates: `${coordsArr[0]},${coordsArr[1]}`,
         };
       } else {
         return false;

@@ -23,29 +23,42 @@ export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
 };
 
 export const findArea = ($: cheerio.CheerioAPI) => {
-  const featuresElement = $("section[data-testid='page_features_section']");
+  const patterns = ['sqft', 'sq ft', 'sq.ft', 'square feet'];
+  const sqFtPattern = patterns.join('|');
 
-  const patterns = ['sqft', 'sq ft', 'square feet'];
+  const listItems = $("div[data-testid='listing_features'] ul li")
+    .map((i, el) => {
+      // Get the text content of the current element
+      const text = $(el).text().trim();
 
-  if (featuresElement.length === 0) {
-    return null;
-  }
+      const patternMatch = patterns.some((pattern) =>
+        text.toLowerCase().includes(pattern)
+      );
 
-  const text = featuresElement.text();
+      // Add a space after the text (except for the last element)
+      return patternMatch ? text : null;
+    })
+    .get();
 
-  for (const pattern of patterns) {
-    const numberMatch = text.match(
-      new RegExp(`(\\d{1,3}(?:,\\d{3})*)\\s*(?=${pattern})`, 'gi')
+  if (listItems.length) {
+    const numberMatch = listItems[0].match(
+      new RegExp(`(\\d+(?:,\\d{3})*(?:\.\\d+)?)\\s+(?=${sqFtPattern})`, 'gi')
     );
 
     if (numberMatch) {
-      if (numberMatch.length > 1) {
-        const withComma = numberMatch.filter((e) => e.includes(','));
-        return extractNumberFromString(withComma[0] || numberMatch[0]);
-      }
-      return extractNumberFromString(numberMatch[0]);
+      const trim = numberMatch[0].replace(/,/g, '').trim();
+      const int = parseInt(trim);
+      return int > 100 ? int : null;
     }
+
+    return null;
   }
+
+  // TODO - use llm to understand text and give mack the correct number
+
+  // const numberMatch = text.match(
+  //   new RegExp(`(\\d+(?:,\\d{3})*(?:\.\\d+)?)\\s+(?=${pattern})`, 'gi')
+  // );
 
   return null;
 };

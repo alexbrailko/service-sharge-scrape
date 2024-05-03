@@ -16,22 +16,30 @@ const findCoordinates = async ($, page) => {
 };
 exports.findCoordinates = findCoordinates;
 const findArea = ($) => {
-    const featuresElement = $("section[data-testid='page_features_section']");
-    const patterns = ['sqft', 'sq ft', 'square feet'];
-    if (featuresElement.length === 0) {
+    const patterns = ['sqft', 'sq ft', 'sq.ft', 'square feet'];
+    const sqFtPattern = patterns.join('|');
+    const listItems = $("div[data-testid='listing_features'] ul li")
+        .map((i, el) => {
+        // Get the text content of the current element
+        const text = $(el).text().trim();
+        const patternMatch = patterns.some((pattern) => text.toLowerCase().includes(pattern));
+        // Add a space after the text (except for the last element)
+        return patternMatch ? text : null;
+    })
+        .get();
+    if (listItems.length) {
+        const numberMatch = listItems[0].match(new RegExp(`(\\d+(?:,\\d{3})*(?:\.\\d+)?)\\s+(?=${sqFtPattern})`, 'gi'));
+        if (numberMatch) {
+            const trim = numberMatch[0].replace(/,/g, '').trim();
+            const int = parseInt(trim);
+            return int > 100 ? int : null;
+        }
         return null;
     }
-    const text = featuresElement.text();
-    for (const pattern of patterns) {
-        const numberMatch = text.match(new RegExp(`(\\d{1,3}(?:,\\d{3})*)\\s*(?=${pattern})`, 'gi'));
-        if (numberMatch) {
-            if (numberMatch.length > 1) {
-                const withComma = numberMatch.filter((e) => e.includes(','));
-                return (0, helpers_1.extractNumberFromString)(withComma[0] || numberMatch[0]);
-            }
-            return (0, helpers_1.extractNumberFromString)(numberMatch[0]);
-        }
-    }
+    // TODO - use llm to understand text and give mack the correct number
+    // const numberMatch = text.match(
+    //   new RegExp(`(\\d+(?:,\\d{3})*(?:\.\\d+)?)\\s+(?=${pattern})`, 'gi')
+    // );
     return null;
 };
 exports.findArea = findArea;
