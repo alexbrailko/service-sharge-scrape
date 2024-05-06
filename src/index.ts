@@ -1,4 +1,5 @@
 import { Browser, Page } from 'puppeteer';
+import cron from 'node-cron';
 import {
   initBrowser,
   connectPrisma,
@@ -13,25 +14,32 @@ const STARTING_URL =
 
 let retryCount = 0;
 
-(async () => {
-  let browser: Browser;
-  let page: Page;
+// will run every Sunday at 8:00
+cron.schedule(
+  '0 8 * * 7',
+  async function () {
+    let browser: Browser;
+    let page: Page;
 
-  try {
-    browser = await initBrowser();
-    page = await browser.newPage();
+    try {
+      browser = await initBrowser();
+      page = await browser.newPage();
 
-    await start(browser, page);
-  } catch (e) {
-    await page.close();
-    await browser.close();
-    console.error('EEE', e);
+      await start(browser, page);
+    } catch (e) {
+      await page.close();
+      await browser.close();
+      console.error('EEE', e);
 
-    browser = await initBrowser();
-    page = await browser.newPage();
-    await restart(browser, page);
+      browser = await initBrowser();
+      page = await browser.newPage();
+      await restart(browser, page);
+    }
+  },
+  {
+    runOnInit: false,
   }
-})();
+);
 
 const start = async (browser: Browser, page: Page) => {
   const prisma = await connectPrisma();

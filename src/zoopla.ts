@@ -96,7 +96,7 @@ export const preparePages = async (
 ) => {
   let newUrl = firstUrl;
 
-  for (let index = 0; index < 70; index++) {
+  for (let index = 0; index < 75; index++) {
     const url = new URL(newUrl);
     const search_params = url.searchParams;
     const priceMin = parseInt(search_params.get('price_min'));
@@ -476,7 +476,7 @@ export const saveToDb = async (
         savedListing.coordinates,
         'Aerial'
       );
-      await saveImage(savedListing, imageUrl, './src/images');
+      await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
     } catch (e) {
       console.log('Error saving to db', e);
       break;

@@ -96,7 +96,7 @@ const agreeOnTerms = async (page) => {
 exports.agreeOnTerms = agreeOnTerms;
 const preparePages = async (firstUrl, prisma, page, browser) => {
     let newUrl = firstUrl;
-    for (let index = 0; index < 70; index++) {
+    for (let index = 0; index < 75; index++) {
         const url = new URL(newUrl);
         const search_params = url.searchParams;
         const priceMin = parseInt(search_params.get('price_min'));
@@ -382,7 +382,7 @@ const saveToDb = async (listings = [], prisma) => {
                 data: listings[i],
             });
             const imageUrl = await (0, api_1.getMapPictureUrl)(savedListing.coordinates, 'Aerial');
-            await (0, exports.saveImage)(savedListing, imageUrl, './src/images');
+            await (0, exports.saveImage)(savedListing, imageUrl, process.env.IMAGES_PATH);
         }
         catch (e) {
             console.log('Error saving to db', e);
