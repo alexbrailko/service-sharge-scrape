@@ -8,8 +8,8 @@ const zoopla_1 = require("./zoopla");
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&pn=1';
 let retryCount = 0;
-// every 2 days '0 0 */2 * *'
-node_cron_1.default.schedule('* * * * *', async function () {
+// will run every Sunday at 8:00
+node_cron_1.default.schedule('0 8 * * 7', async function () {
     let browser;
     let page;
     try {
@@ -26,7 +26,7 @@ node_cron_1.default.schedule('* * * * *', async function () {
         await restart(browser, page);
     }
 }, {
-    runOnInit: false,
+    runOnInit: true,
 });
 const start = async (browser, page) => {
     const prisma = await (0, zoopla_1.connectPrisma)();

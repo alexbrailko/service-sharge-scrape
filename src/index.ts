@@ -37,7 +37,7 @@ cron.schedule(
     }
   },
   {
-    runOnInit: false,
+    runOnInit: true,
   }
 );
 

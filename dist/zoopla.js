@@ -67,8 +67,13 @@ const puppeteerArgs = {
     ],
 };
 const initBrowser = async () => {
-    const browser = await puppeteer_extra_1.default.launch(puppeteerArgs);
-    return browser;
+    try {
+        const browser = await puppeteer_extra_1.default.launch(puppeteerArgs);
+        return browser;
+    }
+    catch (e) {
+        throw e;
+    }
 };
 exports.initBrowser = initBrowser;
 const connectPrisma = async () => {
