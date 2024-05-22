@@ -18,9 +18,9 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
         await start(browser, page);
     }
     catch (e) {
+        console.error('EEE', e);
         await page.close();
         await browser.close();
-        console.error('EEE', e);
         browser = await (0, zoopla_1.initBrowser)();
         page = await browser.newPage();
         await restart(browser, page);

@@ -1,4 +1,5 @@
 import moment from 'moment';
+import { Page } from 'puppeteer';
 
 export function numberWithCommas(x) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -143,4 +144,35 @@ export function isNMonthsApart(date1: Date, date2: Date, months: number = 3) {
 
   // Check if the difference is greater than or equal to 3 months
   return monthsDiff >= months;
+}
+
+export async function navigateWithRetry(page: Page, url: string) {
+  const MAX_RETRIES = 3; // Define maximum retries here
+  let retries = 0;
+  while (retries < MAX_RETRIES) {
+    try {
+      await Promise.all([
+        page.waitForNavigation(),
+        page.goto(url, {
+          waitUntil: ['networkidle0', 'domcontentloaded'],
+          timeout: 10000,
+        }),
+      ]);
+      return; // Success, exit the loop
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('navigation')) {
+        console.log(
+          `Error: Navigation failed for ${url}, retrying (${retries + 1}/${MAX_RETRIES})`
+        );
+        retries++;
+      } else {
+        throw e; // Re-throw other errors
+      }
+    }
+    await delay();
+  }
+  console.error(
+    `Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`
+  );
+  return false;
 }

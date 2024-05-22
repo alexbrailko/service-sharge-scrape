@@ -27,9 +27,9 @@ cron.schedule(
 
       await start(browser, page);
     } catch (e) {
+      console.error('EEE', e);
       await page.close();
       await browser.close();
-      console.error('EEE', e);
 
       browser = await initBrowser();
       page = await browser.newPage();

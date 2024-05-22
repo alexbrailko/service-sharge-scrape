@@ -301,7 +301,12 @@ const scrapeListings = async (listings, page) => {
     for (var i = 0; i < listings.length; i++) {
         let html;
         try {
-            await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
+            await Promise.all([
+                page.waitForNavigation(),
+                page.goto(listings[i].url, {
+                    waitUntil: ['networkidle0', 'domcontentloaded'],
+                }),
+            ]);
             html = await page.content();
         }
         catch (e) {
@@ -309,7 +314,12 @@ const scrapeListings = async (listings, page) => {
             await (0, helpers_1.delay)();
             await (0, helpers_1.delay)();
             await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
-            await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
+            await Promise.all([
+                page.waitForNavigation(),
+                page.goto(listings[i].url, {
+                    waitUntil: ['networkidle0', 'domcontentloaded'],
+                }),
+            ]);
         }
         await (0, helpers_1.delay)();
         const $ = cheerio.load(html);

@@ -12,6 +12,7 @@ import {
   numberDifferencePercentage,
   delay,
   isNMonthsApart,
+  navigateWithRetry,
 } from './helpers';
 import { ListingMainPage, ListingNoId } from './types';
 import fs from 'fs';
@@ -51,10 +52,11 @@ const puppeteerArgs = {
     '--remote-debugging-port=9222',
     '--remote-debugging-address=0.0.0.0', // You know what your doing?
     '--disable-gpu',
-    '--disable-features=IsolateOrigins,site-per-process',
+    //'--disable-features=IsolateOrigins,site-per-process',
     '--blink-settings=imagesEnabled=true',
     '--disable-web-security',
   ],
+  pipe: true,
 };
 
 export const initBrowser = async () => {
@@ -376,14 +378,22 @@ export const scrapeListings = async (
     let html;
 
     try {
-      await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
+      await Promise.all([
+        page.waitForNavigation(),
+        page.goto(listings[i].url, {
+          waitUntil: ['networkidle0', 'domcontentloaded'],
+          timeout: 10000,
+        }),
+      ]);
+
       html = await page.content();
     } catch (e) {
-      console.log('Error: scrapeListings for loop', e);
-      await delay();
-      await delay();
-      await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
-      await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
+      const nav = await navigateWithRetry(page, listings[i].url);
+
+      if (!nav) {
+        console.log('Error in scrapeListings, navigateWithRetry');
+        continue;
+      }
     }
 
     await delay();
