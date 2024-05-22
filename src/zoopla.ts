@@ -123,7 +123,7 @@ export const preparePages = async (
       );
     }
 
-    await scrapeEachPage(newUrl, prisma, page, browser);
+    await scrapeEachPage(newUrl, prisma, page);
 
     if (priceMax == 10000000) {
       break;
@@ -139,17 +139,16 @@ export const preparePages = async (
 export const scrapeEachPage = async (
   url: string,
   prisma: PrismaClient,
-  page: Page,
-  browser: Browser
+  page: Page
 ) => {
-  try {
-    await page.goto(url, { waitUntil: 'networkidle2' });
-  } catch (e) {
-    console.log('Error going to url', e);
-    throw new Error('Failed to load url');
+  const nav = await navigateWithRetry(page, url);
+  if (!nav) {
+    throw new Error('scrapeEachPage top - Failed to load url');
   }
 
   const html = await page.content();
+  await delay();
+
   const $ = cheerio.load(html);
 
   const numberOfPages = 40;

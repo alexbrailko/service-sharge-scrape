@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
+exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
 const moment_1 = __importDefault(require("moment"));
 function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -127,4 +127,33 @@ function isNMonthsApart(date1, date2, months = 3) {
     return monthsDiff >= months;
 }
 exports.isNMonthsApart = isNMonthsApart;
+async function navigateWithRetry(page, url, errMsg) {
+    const MAX_RETRIES = 3; // Define maximum retries here
+    let retries = 0;
+    while (retries < MAX_RETRIES) {
+        try {
+            await Promise.all([
+                page.waitForNavigation(),
+                page.goto(url, {
+                    waitUntil: ['networkidle0', 'domcontentloaded'],
+                    timeout: 10000,
+                }),
+            ]);
+            return; // Success, exit the loop
+        }
+        catch (e) {
+            if (e instanceof Error && e.message.includes('navigation')) {
+                console.log(`Error: Navigation failed for ${url}, retrying (${retries + 1}/${MAX_RETRIES})`);
+                retries++;
+            }
+            else {
+                throw e; // Re-throw other errors
+            }
+        }
+        await delay();
+    }
+    console.error(`Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`);
+    return false;
+}
+exports.navigateWithRetry = navigateWithRetry;
 //# sourceMappingURL=helpers.js.map

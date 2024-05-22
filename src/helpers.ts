@@ -146,7 +146,11 @@ export function isNMonthsApart(date1: Date, date2: Date, months: number = 3) {
   return monthsDiff >= months;
 }
 
-export async function navigateWithRetry(page: Page, url: string) {
+export async function navigateWithRetry(
+  page: Page,
+  url: string,
+  errMsg?: string
+) {
   const MAX_RETRIES = 3; // Define maximum retries here
   let retries = 0;
   while (retries < MAX_RETRIES) {

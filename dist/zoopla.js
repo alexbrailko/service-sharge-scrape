@@ -61,10 +61,11 @@ const puppeteerArgs = {
         '--remote-debugging-port=9222',
         '--remote-debugging-address=0.0.0.0', // You know what your doing?
         '--disable-gpu',
-        '--disable-features=IsolateOrigins,site-per-process',
+        //'--disable-features=IsolateOrigins,site-per-process',
         '--blink-settings=imagesEnabled=true',
         '--disable-web-security',
     ],
+    pipe: true,
 };
 const initBrowser = async () => {
     try {
@@ -111,7 +112,7 @@ const preparePages = async (firstUrl, prisma, page, browser) => {
             newUrl = (0, helpers_1.updateURLParameter)(newUrl, 'price_min', (0, helpers_1.incrementPrice)(priceMin));
             newUrl = (0, helpers_1.updateURLParameter)(newUrl, 'price_max', (0, helpers_1.incrementPrice)(priceMax, true));
         }
-        await (0, exports.scrapeEachPage)(newUrl, prisma, page, browser);
+        await (0, exports.scrapeEachPage)(newUrl, prisma, page);
         if (priceMax == 10000000) {
             break;
         }
@@ -121,15 +122,13 @@ const preparePages = async (firstUrl, prisma, page, browser) => {
     (0, exports.clearScrapedDataFile)();
 };
 exports.preparePages = preparePages;
-const scrapeEachPage = async (url, prisma, page, browser) => {
-    try {
-        await page.goto(url, { waitUntil: 'networkidle2' });
-    }
-    catch (e) {
-        console.log('Error going to url', e);
-        throw new Error('Failed to load url');
+const scrapeEachPage = async (url, prisma, page) => {
+    const nav = await (0, helpers_1.navigateWithRetry)(page, url);
+    if (!nav) {
+        throw new Error('scrapeEachPage top - Failed to load url');
     }
     const html = await page.content();
+    await (0, helpers_1.delay)();
     const $ = cheerio.load(html);
     const numberOfPages = 40;
     let mainUrl = url;
@@ -305,21 +304,17 @@ const scrapeListings = async (listings, page) => {
                 page.waitForNavigation(),
                 page.goto(listings[i].url, {
                     waitUntil: ['networkidle0', 'domcontentloaded'],
+                    timeout: 10000,
                 }),
             ]);
             html = await page.content();
         }
         catch (e) {
-            console.log('Error: scrapeListings for loop', e);
-            await (0, helpers_1.delay)();
-            await (0, helpers_1.delay)();
-            await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
-            await Promise.all([
-                page.waitForNavigation(),
-                page.goto(listings[i].url, {
-                    waitUntil: ['networkidle0', 'domcontentloaded'],
-                }),
-            ]);
+            const nav = await (0, helpers_1.navigateWithRetry)(page, listings[i].url);
+            if (!nav) {
+                console.log('Error in scrapeListings, navigateWithRetry');
+                continue;
+            }
         }
         await (0, helpers_1.delay)();
         const $ = cheerio.load(html);
