@@ -382,32 +382,27 @@ export const scrapeListings = async (
   for (var i = 0; i < listings.length; i++) {
     let html;
 
-    const err = 'Error: scrapeListings for loop';
+    for (let retry = 0; retry < 3; retry++) {
+      // Retry loop with maximum 3 attempts
+      try {
+        await Promise.all([
+          page.waitForNavigation(),
+          page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+        ]);
 
-    try {
-      await navigateWithRetry(page, listings[i].url, err);
-    } catch (e) {
-      console.log('ERROR!');
-      continue;
+        html = await page.content();
+        break; // Exit retry loop on successful navigation
+      } catch (e) {
+        delay(20000);
+        if (e.message.includes('Navigating frame was detached')) {
+          console.log(
+            `Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`
+          );
+        } else {
+          throw e; // Re-throw other errors
+        }
+      }
     }
-
-    // try {
-    //   await Promise.all([
-    //     page.waitForNavigation(),
-    //     page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
-    //   ]);
-
-    //   html = await page.content();
-    // } catch (e) {
-    //   console.log('Error: scrapeListings for loop', e);
-    //   await delay();
-
-    //   await delay();
-    //   await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
-    //   continue;
-    // }
-
-    await delay();
 
     const $ = cheerio.load(html);
 

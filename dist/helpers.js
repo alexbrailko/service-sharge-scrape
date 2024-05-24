@@ -100,9 +100,9 @@ const extractNumberFromText = (el, str) => {
     return extractNumber;
 };
 exports.extractNumberFromText = extractNumberFromText;
-async function delay() {
+async function delay(customDelay) {
     const delay = Math.floor(Math.random() * (4000 - 2000 + 1)) + 2000;
-    return await new Promise((resolve) => setTimeout(resolve, delay));
+    return await new Promise((resolve) => setTimeout(resolve, customDelay ? customDelay : delay));
 }
 exports.delay = delay;
 function numberDifferencePercentage(num1, num2, percent = 5) {
@@ -129,8 +129,8 @@ function isNMonthsApart(date1, date2, months = 3) {
 exports.isNMonthsApart = isNMonthsApart;
 async function navigateWithRetry(page, url, errMsg) {
     const MAX_RETRIES = 3; // Define maximum retries here
-    let retries = 0;
-    while (retries < MAX_RETRIES) {
+    let retries = 1;
+    while (retries <= MAX_RETRIES) {
         try {
             await new Promise((resolve) => setTimeout(resolve, 30000));
             await Promise.all([
@@ -144,7 +144,7 @@ async function navigateWithRetry(page, url, errMsg) {
         }
         catch (e) {
             if (e instanceof Error && e.message.includes('navigating')) {
-                console.log(`Error: Navigation failed for ${url}, retrying (${retries + 1}/${MAX_RETRIES})`);
+                console.log(`Error: Navigation failed for ${url}, retrying (${retries}/${MAX_RETRIES})`);
                 retries++;
             }
             else {

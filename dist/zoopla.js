@@ -304,28 +304,26 @@ const scrapeListings = async (listings, page) => {
     const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         let html;
-        const err = 'Error: scrapeListings for loop';
-        try {
-            await (0, helpers_1.navigateWithRetry)(page, listings[i].url, err);
+        for (let retry = 0; retry < 3; retry++) {
+            // Retry loop with maximum 3 attempts
+            try {
+                await Promise.all([
+                    page.waitForNavigation(),
+                    page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+                ]);
+                html = await page.content();
+                break; // Exit retry loop on successful navigation
+            }
+            catch (e) {
+                (0, helpers_1.delay)(20000);
+                if (e.message.includes('Navigating frame was detached')) {
+                    console.log(`Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`);
+                }
+                else {
+                    throw e; // Re-throw other errors
+                }
+            }
         }
-        catch (e) {
-            console.log('ERROR!');
-            continue;
-        }
-        // try {
-        //   await Promise.all([
-        //     page.waitForNavigation(),
-        //     page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
-        //   ]);
-        //   html = await page.content();
-        // } catch (e) {
-        //   console.log('Error: scrapeListings for loop', e);
-        //   await delay();
-        //   await delay();
-        //   await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
-        //   continue;
-        // }
-        await (0, helpers_1.delay)();
         const $ = cheerio.load(html);
         let listingPrice = $("p[data-testid='price']")
             .text()
