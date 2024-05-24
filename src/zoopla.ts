@@ -204,11 +204,7 @@ export const scrapeEachPage = async (
 
     let listings: ListingNoId[] = [];
 
-    try {
-      listings = await scrapeListings(listingsList, page);
-    } catch (e) {
-      console.log('Error scrapeListings', e);
-    }
+    listings = await scrapeListings(listingsList, page);
 
     listingsData.push.apply(listingsData, listings);
     // remove duplicates from listings
@@ -399,9 +395,16 @@ export const scrapeListings = async (
             `Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`
           );
         } else {
-          throw e; // Re-throw other errors
+          throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
         }
       }
+    }
+
+    if (!html) {
+      console.error(
+        `Failed to scrape listing: ${listings[i].url} after 3 retries.`
+      );
+      continue;
     }
 
     const $ = cheerio.load(html);
