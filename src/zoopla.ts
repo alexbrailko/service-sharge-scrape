@@ -390,14 +390,9 @@ export const scrapeListings = async (
         break; // Exit retry loop on successful navigation
       } catch (e) {
         await delay(20000);
-        if (e.message.includes('Navigating frame was detached')) {
-          console.log(
-            `Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`
-          );
-        } else {
-          console.log('Nav error', e);
-          //throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
-        }
+        await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
+        console.log('Nav error', e);
+        //throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
       }
     }
 
@@ -405,7 +400,7 @@ export const scrapeListings = async (
       console.error(
         `Failed to scrape listing: ${listings[i].url} after 3 retries.`
       );
-      continue;
+      throw new Error('Failed to scrape listings');
     }
 
     const $ = cheerio.load(html);
