@@ -12,7 +12,6 @@ import {
   numberDifferencePercentage,
   delay,
   isNMonthsApart,
-  navigateWithRetry,
 } from './helpers';
 import { ListingMainPage, ListingNoId } from './types';
 import fs from 'fs';
@@ -52,11 +51,10 @@ const puppeteerArgs = {
     '--remote-debugging-port=9222',
     '--remote-debugging-address=0.0.0.0', // You know what your doing?
     '--disable-gpu',
-    //'--disable-features=IsolateOrigins,site-per-process',
+    '--disable-features=IsolateOrigins,site-per-process',
     '--blink-settings=imagesEnabled=true',
     '--disable-web-security',
   ],
-  pipe: true,
 };
 
 export const initBrowser = async () => {
@@ -123,7 +121,7 @@ export const preparePages = async (
       );
     }
 
-    await scrapeEachPage(newUrl, prisma, page);
+    await scrapeEachPage(newUrl, prisma, page, browser);
 
     if (priceMax == 10000000) {
       break;
@@ -139,15 +137,17 @@ export const preparePages = async (
 export const scrapeEachPage = async (
   url: string,
   prisma: PrismaClient,
-  page: Page
+  page: Page,
+  browser: Browser
 ) => {
-  const err = 'scrapeEachPage top - Failed to load url';
-
-  await navigateWithRetry(page, url, err);
+  try {
+    await page.goto(url, { waitUntil: 'networkidle2' });
+  } catch (e) {
+    console.log('Error going to url', e);
+    throw new Error('Failed to load url');
+  }
 
   const html = await page.content();
-  await delay();
-
   const $ = cheerio.load(html);
 
   const numberOfPages = 40;
@@ -376,23 +376,15 @@ export const scrapeListings = async (
     let html;
 
     try {
-      await Promise.all([
-        page.waitForNavigation(),
-        page.goto(listings[i].url, {
-          waitUntil: ['networkidle0', 'domcontentloaded'],
-          timeout: 10000,
-        }),
-      ]);
-
+      await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
       html = await page.content();
     } catch (e) {
-      const err = 'Error in scrapeListings, navigateWithRetry';
-      try {
-        await navigateWithRetry(page, listings[i].url);
-      } catch (e) {
-        console.log(err);
-        continue;
-      }
+      console.log('Error: scrapeListings for loop', e);
+      await delay();
+      continue;
+      // await delay();
+      // await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
+      // await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
     }
 
     await delay();
