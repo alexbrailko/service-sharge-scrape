@@ -263,6 +263,10 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
         if (highlighted.length) {
             return null;
         }
+        const backToMarket = $(element).find("div:contains('Back to market')");
+        if (backToMarket.length) {
+            return null;
+        }
         // if (moment(datePosted) <= moment(latestPostDate)) {
         //   finishCurrentUrl = true;
         // }
@@ -300,18 +304,27 @@ const scrapeListings = async (listings, page) => {
     const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         let html;
+        const err = 'Error: scrapeListings for loop';
         try {
-            await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
-            html = await page.content();
+            await (0, helpers_1.navigateWithRetry)(page, listings[i].url, err);
         }
         catch (e) {
-            console.log('Error: scrapeListings for loop', e);
-            await (0, helpers_1.delay)();
+            console.log('ERROR!');
             continue;
-            // await delay();
-            // await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
-            // await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
         }
+        // try {
+        //   await Promise.all([
+        //     page.waitForNavigation(),
+        //     page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+        //   ]);
+        //   html = await page.content();
+        // } catch (e) {
+        //   console.log('Error: scrapeListings for loop', e);
+        //   await delay();
+        //   await delay();
+        //   await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
+        //   continue;
+        // }
         await (0, helpers_1.delay)();
         const $ = cheerio.load(html);
         let listingPrice = $("p[data-testid='price']")

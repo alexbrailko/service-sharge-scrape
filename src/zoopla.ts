@@ -12,6 +12,7 @@ import {
   numberDifferencePercentage,
   delay,
   isNMonthsApart,
+  navigateWithRetry,
 } from './helpers';
 import { ListingMainPage, ListingNoId } from './types';
 import fs from 'fs';
@@ -381,22 +382,30 @@ export const scrapeListings = async (
   for (var i = 0; i < listings.length; i++) {
     let html;
 
+    const err = 'Error: scrapeListings for loop';
+
     try {
-      await Promise.all([
-        page.waitForNavigation(),
-        page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
-      ]);
-
-      html = await page.content();
+      await navigateWithRetry(page, listings[i].url, err);
     } catch (e) {
-      console.log('Error: scrapeListings for loop', e);
-      await delay();
-
-      await delay();
-      await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
+      console.log('ERROR!');
       continue;
-      // await page.goto(listings[i].url, { waitUntil: 'networkidle2' });
     }
+
+    // try {
+    //   await Promise.all([
+    //     page.waitForNavigation(),
+    //     page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+    //   ]);
+
+    //   html = await page.content();
+    // } catch (e) {
+    //   console.log('Error: scrapeListings for loop', e);
+    //   await delay();
+
+    //   await delay();
+    //   await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
+    //   continue;
+    // }
 
     await delay();
 

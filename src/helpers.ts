@@ -155,6 +155,7 @@ export async function navigateWithRetry(
   let retries = 0;
   while (retries < MAX_RETRIES) {
     try {
+      await new Promise((resolve) => setTimeout(resolve, 30000));
       await Promise.all([
         page.waitForNavigation(),
         page.goto(url, {
@@ -162,21 +163,19 @@ export async function navigateWithRetry(
           timeout: 10000,
         }),
       ]);
-      return; // Success, exit the loop
+      break;
     } catch (e) {
-      if (e instanceof Error && e.message.includes('navigation')) {
+      if (e instanceof Error && e.message.includes('navigating')) {
         console.log(
           `Error: Navigation failed for ${url}, retrying (${retries + 1}/${MAX_RETRIES})`
         );
         retries++;
       } else {
-        throw new Error(errMsg); // Re-throw other errors
+        throw new Error(`Error: ${e}, ${errMsg}`); // Re-throw other errors
       }
     }
-    await delay();
   }
   console.error(
     `Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`
   );
-  //return false;
 }
