@@ -7,6 +7,7 @@ import {
   preparePages,
   readScrapedData,
 } from './zoopla';
+import { delay } from './helpers';
 
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL =
@@ -30,9 +31,11 @@ cron.schedule(
       console.error('EEE', e);
       await page.close();
       await browser.close();
-
+      console.log('1');
+      await delay(10000);
       browser = await initBrowser();
       page = await browser.newPage();
+      console.log('2');
       await restart(browser, page);
     }
   },

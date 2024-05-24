@@ -395,7 +395,8 @@ export const scrapeListings = async (
             `Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`
           );
         } else {
-          throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
+          console.log('Nav error', e);
+          //throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
         }
       }
     }
