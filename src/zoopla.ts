@@ -204,7 +204,7 @@ export const scrapeEachPage = async (
 
     let listings: ListingNoId[] = [];
 
-    listings = await scrapeListings(listingsList, page);
+    listings = await scrapeListings(listingsList, browser);
 
     listingsData.push.apply(listingsData, listings);
     // remove duplicates from listings
@@ -369,7 +369,7 @@ export const scrapeListingsList = async (
 
 export const scrapeListings = async (
   listings: ListingMainPage[],
-  page: Page
+  browser: Browser
 ): Promise<ListingNoId[]> => {
   if (!listings.length) return [];
 
@@ -377,6 +377,7 @@ export const scrapeListings = async (
 
   for (var i = 0; i < listings.length; i++) {
     let html;
+    const page = await browser.newPage();
 
     for (let retry = 0; retry < 3; retry++) {
       // Retry loop with maximum 3 attempts
@@ -389,10 +390,13 @@ export const scrapeListings = async (
         html = await page.content();
         break; // Exit retry loop on successful navigation
       } catch (e) {
-        await delay(20000);
-        await page.reload({ waitUntil: ['networkidle0', 'domcontentloaded'] });
         console.log('Nav error', e);
-        //throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
+        // await delay(10000);
+        // await page.close();
+        // await delay();
+        // await page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+
+        throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
       }
     }
 
@@ -474,6 +478,8 @@ export const scrapeListings = async (
     };
 
     listingsData.push(listingData);
+
+    await page.close();
   }
 
   return listingsData.filter(

@@ -29,8 +29,18 @@ cron.schedule(
       await start(browser, page);
     } catch (e) {
       console.error('EEE', e);
-      await page.close();
-      await browser.close();
+      try {
+        await page.close();
+      } catch (e) {
+        console.log('Error page close');
+      }
+
+      try {
+        await browser.close();
+      } catch (e) {
+        console.log('Error browser close');
+      }
+
       console.log('1');
       await delay(10000);
       browser = await initBrowser();

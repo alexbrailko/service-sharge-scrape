@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_cron_1 = __importDefault(require("node-cron"));
 const zoopla_1 = require("./zoopla");
+const helpers_1 = require("./helpers");
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&pn=1';
 let retryCount = 0;
@@ -19,10 +20,23 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
     }
     catch (e) {
         console.error('EEE', e);
-        await page.close();
-        await browser.close();
+        try {
+            await page.close();
+        }
+        catch (e) {
+            console.log('Error page close');
+        }
+        try {
+            await browser.close();
+        }
+        catch (e) {
+            console.log('Error browser close');
+        }
+        console.log('1');
+        await (0, helpers_1.delay)(10000);
         browser = await (0, zoopla_1.initBrowser)();
         page = await browser.newPage();
+        console.log('2');
         await restart(browser, page);
     }
 }, {

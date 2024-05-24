@@ -168,19 +168,14 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
             break;
         }
         let listings = [];
-        try {
-            listings = await (0, exports.scrapeListings)(listingsList, page);
-        }
-        catch (e) {
-            console.log('Error scrapeListings', e);
-        }
+        listings = await (0, exports.scrapeListings)(listingsList, browser);
         listingsData.push.apply(listingsData, listings);
         // remove duplicates from listings
         if (listingsData.length) {
             listingsData = listingsData.filter((v, i, a) => a.findIndex((v2) => ['address'].every((k) => v2[k] === v[k])) === i);
             listingsData = await (0, exports.checkServiceChargeHistory)(listingsData, prisma);
             console.log('listingsData length', listingsData.length);
-            await (0, exports.saveToDb)(listingsData, prisma);
+            // await saveToDb(listingsData, prisma);
             listingsData = [];
         }
         if (finishCurrentUrl) {
@@ -298,12 +293,13 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
     }
 };
 exports.scrapeListingsList = scrapeListingsList;
-const scrapeListings = async (listings, page) => {
+const scrapeListings = async (listings, browser) => {
     if (!listings.length)
         return [];
     const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         let html;
+        const page = await browser.newPage();
         for (let retry = 0; retry < 3; retry++) {
             // Retry loop with maximum 3 attempts
             try {
@@ -315,14 +311,17 @@ const scrapeListings = async (listings, page) => {
                 break; // Exit retry loop on successful navigation
             }
             catch (e) {
-                (0, helpers_1.delay)(20000);
-                if (e.message.includes('Navigating frame was detached')) {
-                    console.log(`Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`);
-                }
-                else {
-                    throw e; // Re-throw other errors
-                }
+                console.log('Nav error', e);
+                // await delay(10000);
+                // await page.close();
+                // await delay();
+                // await page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+                throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
             }
+        }
+        if (!html) {
+            console.error(`Failed to scrape listing: ${listings[i].url} after 3 retries.`);
+            throw new Error('Failed to scrape listings');
         }
         const $ = cheerio.load(html);
         let listingPrice = $("p[data-testid='price']")
@@ -388,6 +387,7 @@ const scrapeListings = async (listings, page) => {
             serviceChargeHistory: '',
         };
         listingsData.push(listingData);
+        await page.close();
     }
     return listingsData.filter((listing) => listing.serviceCharge !== null && listing.serviceCharge !== 0);
 };
