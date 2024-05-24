@@ -328,6 +328,12 @@ export const scrapeListingsList = async (
         return null;
       }
 
+      const backToMarket = $(element).find("div:contains('Back to market')");
+
+      if (backToMarket.length) {
+        return null;
+      }
+
       // if (moment(datePosted) <= moment(latestPostDate)) {
       //   finishCurrentUrl = true;
       // }
