@@ -50,7 +50,7 @@ cron.schedule(
     }
   },
   {
-    runOnInit: true,
+    runOnInit: false,
   }
 );
 
