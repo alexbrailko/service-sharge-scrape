@@ -389,7 +389,7 @@ export const scrapeListings = async (
         html = await page.content();
         break; // Exit retry loop on successful navigation
       } catch (e) {
-        delay(20000);
+        await delay(20000);
         if (e.message.includes('Navigating frame was detached')) {
           console.log(
             `Error: Navigating frame was detached (retry ${retry + 1}/3) for listing: ${listings[i].url}`
