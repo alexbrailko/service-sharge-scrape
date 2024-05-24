@@ -123,10 +123,8 @@ const preparePages = async (firstUrl, prisma, page, browser) => {
 };
 exports.preparePages = preparePages;
 const scrapeEachPage = async (url, prisma, page) => {
-    const nav = await (0, helpers_1.navigateWithRetry)(page, url);
-    if (!nav) {
-        throw new Error('scrapeEachPage top - Failed to load url');
-    }
+    const err = 'scrapeEachPage top - Failed to load url';
+    await (0, helpers_1.navigateWithRetry)(page, url, err);
     const html = await page.content();
     await (0, helpers_1.delay)();
     const $ = cheerio.load(html);
@@ -310,9 +308,12 @@ const scrapeListings = async (listings, page) => {
             html = await page.content();
         }
         catch (e) {
-            const nav = await (0, helpers_1.navigateWithRetry)(page, listings[i].url);
-            if (!nav) {
-                console.log('Error in scrapeListings, navigateWithRetry');
+            const err = 'Error in scrapeListings, navigateWithRetry';
+            try {
+                await (0, helpers_1.navigateWithRetry)(page, listings[i].url);
+            }
+            catch (e) {
+                console.log(err);
                 continue;
             }
         }

@@ -147,13 +147,13 @@ async function navigateWithRetry(page, url, errMsg) {
                 retries++;
             }
             else {
-                throw e; // Re-throw other errors
+                throw new Error(errMsg); // Re-throw other errors
             }
         }
         await delay();
     }
     console.error(`Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`);
-    return false;
+    //return false;
 }
 exports.navigateWithRetry = navigateWithRetry;
 //# sourceMappingURL=helpers.js.map

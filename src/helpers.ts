@@ -170,7 +170,7 @@ export async function navigateWithRetry(
         );
         retries++;
       } else {
-        throw e; // Re-throw other errors
+        throw new Error(errMsg); // Re-throw other errors
       }
     }
     await delay();
@@ -178,5 +178,5 @@ export async function navigateWithRetry(
   console.error(
     `Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`
   );
-  return false;
+  //return false;
 }

@@ -141,10 +141,9 @@ export const scrapeEachPage = async (
   prisma: PrismaClient,
   page: Page
 ) => {
-  const nav = await navigateWithRetry(page, url);
-  if (!nav) {
-    throw new Error('scrapeEachPage top - Failed to load url');
-  }
+  const err = 'scrapeEachPage top - Failed to load url';
+
+  await navigateWithRetry(page, url, err);
 
   const html = await page.content();
   await delay();
@@ -387,10 +386,11 @@ export const scrapeListings = async (
 
       html = await page.content();
     } catch (e) {
-      const nav = await navigateWithRetry(page, listings[i].url);
-
-      if (!nav) {
-        console.log('Error in scrapeListings, navigateWithRetry');
+      const err = 'Error in scrapeListings, navigateWithRetry';
+      try {
+        await navigateWithRetry(page, listings[i].url);
+      } catch (e) {
+        console.log(err);
         continue;
       }
     }
