@@ -101,7 +101,7 @@ export const preparePages = async (
 ) => {
   let newUrl = firstUrl;
 
-  for (let index = 0; index < 80; index++) {
+  for (let index = 0; index < 97; index++) {
     const url = new URL(newUrl);
     const search_params = url.searchParams;
     const priceMin = parseInt(search_params.get('price_min'));

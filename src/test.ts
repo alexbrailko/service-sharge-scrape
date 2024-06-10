@@ -1,4 +1,4 @@
-import * as cheerio from 'cheerio';
+import { preparePages } from './zoopla';
 
 async function extractNumber() {
   const { pipeline } = await import('@xenova/transformers');
@@ -69,15 +69,6 @@ async function extractNumber() {
 //   },
 // ];
 
-import {
-  checkServiceChargeHistory,
-  connectPrisma,
-  initBrowser,
-} from './zoopla';
-import { getAddressData } from './api';
-import { findArea, findCoordinates, findServiceCharge } from './findData';
-import { delay } from './helpers';
-
 // (async () => {
 //   const browser = await initBrowser();
 //   const prisma = await connectPrisma();
@@ -92,50 +83,56 @@ import { delay } from './helpers';
 //   await browser.close();
 // })();
 
+// (async () => {
+//   const browser = await initBrowser();
+//   const prisma = await connectPrisma();
+//   const page = await browser.newPage();
+
+//   const data = await prisma.listing.findMany({
+//     where: {
+//       area: null,
+//       datePosted: {
+//         gte: new Date('2023-09-30'),
+//       },
+//     },
+//     skip: 1480,
+//   });
+
+//   console.log('data', data.length);
+
+//   for (let index = 0; index < data.length; index++) {
+//     const element = data[index];
+
+//     await page.goto(element.url, {
+//       waitUntil: 'networkidle2',
+//     });
+//     const html = await page.content();
+//     const $ = cheerio.load(html);
+//     const area = findArea($);
+//     console.log('id', element.id, '   ', index + 1);
+
+//     //const res = await getAddressData(element.coordinates);
+//     if (area) {
+//       console.log('area', area);
+
+//       await prisma.listing.update({
+//         where: {
+//           id: element.id,
+//         },
+//         data: {
+//           area: area,
+//         },
+//       });
+//       // await new Promise((resolve) => setTimeout(resolve, 300));
+//       // console.log('scraped', element.id, index);
+//     }
+//     await delay();
+//   }
+//   await browser.close();
+// })();
+
 (async () => {
-  const browser = await initBrowser();
-  const prisma = await connectPrisma();
-  const page = await browser.newPage();
-
-  const data = await prisma.listing.findMany({
-    where: {
-      area: null,
-      datePosted: {
-        gte: new Date('2023-09-30'),
-      },
-    },
-    skip: 1480,
-  });
-
-  console.log('data', data.length);
-
-  for (let index = 0; index < data.length; index++) {
-    const element = data[index];
-
-    await page.goto(element.url, {
-      waitUntil: 'networkidle2',
-    });
-    const html = await page.content();
-    const $ = cheerio.load(html);
-    const area = findArea($);
-    console.log('id', element.id, '   ', index + 1);
-
-    //const res = await getAddressData(element.coordinates);
-    if (area) {
-      console.log('area', area);
-
-      await prisma.listing.update({
-        where: {
-          id: element.id,
-        },
-        data: {
-          area: area,
-        },
-      });
-      // await new Promise((resolve) => setTimeout(resolve, 300));
-      // console.log('scraped', element.id, index);
-    }
-    await delay();
-  }
-  await browser.close();
+  const STARTING_URL =
+    'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&pn=1';
+  await preparePages(STARTING_URL, null, null, null);
 })();

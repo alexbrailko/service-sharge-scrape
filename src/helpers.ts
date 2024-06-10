@@ -66,9 +66,11 @@ export const incrementPrice = (price: number, isMax?: boolean) => {
 
   if (newPrice < 1000000) {
     newPrice = newPrice + 50000;
-  } else if (newPrice >= 1000000 && newPrice < 3000000) {
-    newPrice = newPrice + 100000;
-  } else {
+  }
+  // else if (newPrice >= 1000000 && newPrice < 3000000) {
+  //   newPrice = newPrice + 100000;
+  // }
+  else {
     newPrice = newPrice + 500000;
   }
 

@@ -40,7 +40,7 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
         await restart(browser, page);
     }
 }, {
-    runOnInit: true,
+    runOnInit: false,
 });
 const start = async (browser, page) => {
     const prisma = await (0, zoopla_1.connectPrisma)();

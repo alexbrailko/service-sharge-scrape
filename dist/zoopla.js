@@ -101,7 +101,7 @@ const agreeOnTerms = async (page) => {
 exports.agreeOnTerms = agreeOnTerms;
 const preparePages = async (firstUrl, prisma, page, browser) => {
     let newUrl = firstUrl;
-    for (let index = 0; index < 75; index++) {
+    for (let index = 0; index < 97; index++) {
         const url = new URL(newUrl);
         const search_params = url.searchParams;
         const priceMin = parseInt(search_params.get('price_min'));
@@ -175,7 +175,7 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
             listingsData = listingsData.filter((v, i, a) => a.findIndex((v2) => ['address'].every((k) => v2[k] === v[k])) === i);
             listingsData = await (0, exports.checkServiceChargeHistory)(listingsData, prisma);
             console.log('listingsData length', listingsData.length);
-            // await saveToDb(listingsData, prisma);
+            await (0, exports.saveToDb)(listingsData, prisma);
             listingsData = [];
         }
         if (finishCurrentUrl) {
@@ -388,6 +388,7 @@ const scrapeListings = async (listings, browser) => {
         };
         listingsData.push(listingData);
         await page.close();
+        await (0, helpers_1.delay)();
     }
     return listingsData.filter((listing) => listing.serviceCharge !== null && listing.serviceCharge !== 0);
 };
