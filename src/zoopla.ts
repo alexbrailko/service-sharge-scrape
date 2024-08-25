@@ -451,6 +451,10 @@ export const scrapeListings = async (
     if (serviceCharge) {
       coordinates = await findCoordinates($, page);
 
+      if (!coordinates) {
+        continue;
+      }
+
       try {
         const addressData = await getAddressData(coordinates);
 
