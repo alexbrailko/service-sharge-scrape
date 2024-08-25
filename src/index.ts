@@ -41,16 +41,15 @@ cron.schedule(
         console.log('Error browser close');
       }
 
-      console.log('1');
       await delay(10000);
       browser = await initBrowser();
       page = await browser.newPage();
-      console.log('2');
+
       await restart(browser, page);
     }
   },
   {
-    runOnInit: false,
+    runOnInit: true,
   }
 );
 

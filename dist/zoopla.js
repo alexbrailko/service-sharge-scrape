@@ -72,6 +72,7 @@ const initBrowser = async () => {
         return browser;
     }
     catch (e) {
+        console.log('Error initBrowser', e);
         throw e;
     }
 };
@@ -89,10 +90,10 @@ const connectPrisma = async () => {
 exports.connectPrisma = connectPrisma;
 const agreeOnTerms = async (page) => {
     try {
-        const elementHandle = await page.waitForSelector('#gdpr-consent-tool-wrapper iframe');
-        const frame = await elementHandle.contentFrame();
-        const button = await frame.$('#save');
-        await button.click();
+        await page.waitForSelector('#onetrust-banner-sdk', { timeout: 7000 });
+        // const frame = await elementHandle.contentFrame();
+        // const button = await frame.$('#save');
+        await page.click('#onetrust-accept-btn-handler');
     }
     catch (e) {
         console.log('Error agreeOnTeerms', e);
@@ -174,7 +175,6 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
         if (listingsData.length) {
             listingsData = listingsData.filter((v, i, a) => a.findIndex((v2) => ['address'].every((k) => v2[k] === v[k])) === i);
             listingsData = await (0, exports.checkServiceChargeHistory)(listingsData, prisma);
-            console.log('listingsData length', listingsData.length);
             await (0, exports.saveToDb)(listingsData, prisma);
             listingsData = [];
         }
@@ -193,14 +193,21 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
                 }),
                 //page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
             ]);
-            const isLastPage = $("div[data-testid='pagination']")
-                .find("use[href='#arrow-right-medium']")
-                .parent()
-                .parent()
-                .parent()
-                .parent()
-                .attr('aria-disabled');
-            if (isLastPage === 'true') {
+            // const isLastPage = $("div[data-testid='pagination']")
+            //   .find("use[href='#arrow-right-medium']")
+            //   .parent()
+            //   .parent()
+            //   .parent()
+            //   .parent()
+            //   .attr('aria-disabled');
+            const nextLink = await page.evaluateHandle(() => {
+                const nav = document.querySelector('nav[aria-label="pagination"]');
+                if (!nav)
+                    return null;
+                return Array.from(nav.querySelectorAll('a')).find((el) => el.textContent.includes('Next'));
+            });
+            const isLastPage = await nextLink.evaluate((el) => el.getAttribute('aria-disabled') === 'true');
+            if (isLastPage) {
                 console.log('LAST PAGE');
                 break;
             }
@@ -247,6 +254,9 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
         const timezoneOffset = dateFormatted.getTimezoneOffset() * 60000;
         const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
         const lastReduced = $(element).find("span:contains('Last reduced')");
+        if (!url) {
+            return null;
+        }
         if (lastReduced.length && (0, moment_1.default)(datePosted) <= (0, moment_1.default)(latestPostDate)) {
             return null;
         }
@@ -283,6 +293,7 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
     const filteredByDate = listings.filter((obj) => (0, moment_1.default)(obj.datePosted) < (0, moment_1.default)(latestPostDate));
     if (filteredByDate.length > 2) {
         finishCurrentUrl = true;
+        console.log('finishCurrentUrl');
         return [];
     }
     else if (filteredByDate.length && filteredByDate.length <= 2) {

@@ -32,15 +32,13 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
         catch (e) {
             console.log('Error browser close');
         }
-        console.log('1');
         await (0, helpers_1.delay)(10000);
         browser = await (0, zoopla_1.initBrowser)();
         page = await browser.newPage();
-        console.log('2');
         await restart(browser, page);
     }
 }, {
-    runOnInit: false,
+    runOnInit: true,
 });
 const start = async (browser, page) => {
     const prisma = await (0, zoopla_1.connectPrisma)();

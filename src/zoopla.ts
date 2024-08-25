@@ -63,6 +63,7 @@ export const initBrowser = async () => {
     const browser = await puppeteer.launch(puppeteerArgs);
     return browser;
   } catch (e) {
+    console.log('Error initBrowser', e);
     throw e;
   }
 };
@@ -80,14 +81,12 @@ export const connectPrisma = async () => {
 
 export const agreeOnTerms = async (page: Page) => {
   try {
-    const elementHandle = await page.waitForSelector(
-      '#gdpr-consent-tool-wrapper iframe'
-    );
+    await page.waitForSelector('#onetrust-banner-sdk', { timeout: 7000 });
 
-    const frame = await elementHandle.contentFrame();
-    const button = await frame.$('#save');
+    // const frame = await elementHandle.contentFrame();
+    // const button = await frame.$('#save');
 
-    await button.click();
+    await page.click('#onetrust-accept-btn-handler');
   } catch (e) {
     console.log('Error agreeOnTeerms', e);
   }
@@ -207,6 +206,7 @@ export const scrapeEachPage = async (
     listings = await scrapeListings(listingsList, browser);
 
     listingsData.push.apply(listingsData, listings);
+
     // remove duplicates from listings
     if (listingsData.length) {
       listingsData = listingsData.filter(
@@ -215,8 +215,6 @@ export const scrapeEachPage = async (
       );
 
       listingsData = await checkServiceChargeHistory(listingsData, prisma);
-
-      console.log('listingsData length', listingsData.length);
 
       await saveToDb(listingsData, prisma);
 
@@ -241,15 +239,27 @@ export const scrapeEachPage = async (
         }),
         //page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
       ]);
-      const isLastPage = $("div[data-testid='pagination']")
-        .find("use[href='#arrow-right-medium']")
-        .parent()
-        .parent()
-        .parent()
-        .parent()
-        .attr('aria-disabled');
+      // const isLastPage = $("div[data-testid='pagination']")
+      //   .find("use[href='#arrow-right-medium']")
+      //   .parent()
+      //   .parent()
+      //   .parent()
+      //   .parent()
+      //   .attr('aria-disabled');
 
-      if (isLastPage === 'true') {
+      const nextLink = await page.evaluateHandle(() => {
+        const nav = document.querySelector('nav[aria-label="pagination"]');
+        if (!nav) return null;
+
+        return Array.from(nav.querySelectorAll('a')).find((el) =>
+          el.textContent.includes('Next')
+        );
+      });
+      const isLastPage = await nextLink.evaluate(
+        (el) => el.getAttribute('aria-disabled') === 'true'
+      );
+
+      if (isLastPage) {
         console.log('LAST PAGE');
         break;
       }
@@ -307,6 +317,10 @@ export const scrapeListingsList = async (
 
       const lastReduced = $(element).find("span:contains('Last reduced')");
 
+      if (!url) {
+        return null;
+      }
+
       if (lastReduced.length && moment(datePosted) <= moment(latestPostDate)) {
         return null;
       }
@@ -357,6 +371,7 @@ export const scrapeListingsList = async (
 
   if (filteredByDate.length > 2) {
     finishCurrentUrl = true;
+    console.log('finishCurrentUrl');
     return [];
   } else if (filteredByDate.length && filteredByDate.length <= 2) {
     return listings.filter(
@@ -381,6 +396,7 @@ export const scrapeListings = async (
 
     for (let retry = 0; retry < 3; retry++) {
       // Retry loop with maximum 3 attempts
+
       try {
         await Promise.all([
           page.waitForNavigation(),
@@ -437,6 +453,7 @@ export const scrapeListings = async (
 
       try {
         const addressData = await getAddressData(coordinates);
+
         if (!addressData) {
           continue;
         } else {
@@ -454,6 +471,7 @@ export const scrapeListings = async (
       }
 
       groundRent = findGroundRent($);
+
       serviceCharge = serviceCharge > 40 ? serviceCharge : null;
     }
 

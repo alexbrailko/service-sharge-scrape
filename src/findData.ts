@@ -8,14 +8,14 @@ import {
 
 export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
   try {
-    await page.waitForSelector("picture[data-testid='static-google-image']");
+    await page.waitForSelector('section[aria-labelledby="local-area"]');
   } catch (e) {
     console.log('Error findCoordinates');
   }
 
-  const src = $("picture[data-testid='static-google-image'] source").attr(
-    'srcset'
-  );
+  const src = $('section[aria-labelledby="local-area"]')
+    .find('picture source')
+    .attr('srcset');
   const urlParams = new URLSearchParams(src);
   const coordinates = urlParams.get('center'); //51.544505,-0.110049
 
@@ -26,7 +26,7 @@ export const findArea = ($: cheerio.CheerioAPI) => {
   const patterns = ['sqft', 'sq ft', 'sq.ft', 'square feet'];
   const sqFtPattern = patterns.join('|');
 
-  const listItems = $("div[data-testid='listing_features'] ul li")
+  const listItems = $('section[aria-labelledby="about"] ul li')
     .map((i, el) => {
       // Get the text content of the current element
       const text = $(el).text().trim();
@@ -65,13 +65,11 @@ export const findArea = ($: cheerio.CheerioAPI) => {
 
 export const findGroundRent = ($: cheerio.CheerioAPI) => {
   const text = 'ground rent';
-  const groundRentElem = $(
-    "button[data-testid='ground-rent-help-icon-wrapper']"
-  )
-    .parent()
-    .parent();
+  const groundRentElem = $('section[aria-labelledby="key-info"]')
+    .find('li')
+    .filter((i, el) => $(el).text().toLowerCase().includes(text));
 
-  const groundRentText = $(groundRentElem).text();
+  const groundRentText = $(groundRentElem).find(' > div p').text();
 
   if (!groundRentText || groundRentText === 'Not available') {
     // search in features section
@@ -107,13 +105,11 @@ export const findGroundRent = ($: cheerio.CheerioAPI) => {
 export const findServiceCharge = ($: cheerio.CheerioAPI) => {
   const text = 'service charge';
 
-  const serviceChargeElem = $(
-    "button[data-testid='service-charge-help-icon-wrapper']"
-  )
-    .parent()
-    .parent();
+  const serviceChargeElem = $('section[aria-labelledby="key-info"]')
+    .find('li')
+    .filter((i, el) => $(el).text().toLowerCase().includes(text));
 
-  const serviceChargeText = $(serviceChargeElem).text();
+  const serviceChargeText = $(serviceChargeElem).find(' > div p').text();
 
   let serviceChargeAmount: number = null;
 
