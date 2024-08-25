@@ -3,15 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.findServiceCharge = exports.findGroundRent = exports.findArea = exports.findCoordinates = void 0;
 const helpers_1 = require("./helpers");
 const findCoordinates = async ($, page) => {
-    try {
-        await page.waitForSelector('section[aria-labelledby="local-area"]');
-    }
-    catch (e) {
-        console.log('Error findCoordinates');
-    }
-    const src = $('section[aria-labelledby="local-area"]')
-        .find('picture source')
-        .attr('srcset');
+    const src = $('section[aria-labelledby="local-area"] picture source').attr('srcset');
     const urlParams = new URLSearchParams(src);
     const coordinates = urlParams.get('center'); //51.544505,-0.110049
     return coordinates;

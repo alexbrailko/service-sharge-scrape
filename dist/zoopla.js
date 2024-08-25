@@ -357,6 +357,9 @@ const scrapeListings = async (listings, browser) => {
         //let pictures = [];
         if (serviceCharge) {
             coordinates = await (0, findData_1.findCoordinates)($, page);
+            if (!coordinates) {
+                continue;
+            }
             try {
                 const addressData = await (0, api_1.getAddressData)(coordinates);
                 if (!addressData) {

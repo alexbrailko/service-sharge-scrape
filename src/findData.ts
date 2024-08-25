@@ -7,9 +7,10 @@ import {
 } from './helpers';
 
 export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
-  const src = $('section[aria-labelledby="local-area"]')
-    .find('picture source')
-    .attr('srcset');
+  const src = $('section[aria-labelledby="local-area"] picture source').attr(
+    'srcset'
+  );
+
   const urlParams = new URLSearchParams(src);
   const coordinates = urlParams.get('center'); //51.544505,-0.110049
 
