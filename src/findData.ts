@@ -7,15 +7,6 @@ import {
 } from './helpers';
 
 export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
-  try {
-    await page.waitForSelector('section[aria-labelledby="local-area"]', {
-      timeout: 7000,
-    });
-  } catch (e) {
-    console.log('Error findCoordinates');
-    return null;
-  }
-
   const src = $('section[aria-labelledby="local-area"]')
     .find('picture source')
     .attr('srcset');

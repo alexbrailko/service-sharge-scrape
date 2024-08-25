@@ -452,6 +452,8 @@ export const scrapeListings = async (
       coordinates = await findCoordinates($, page);
 
       if (!coordinates) {
+        console.log('no coordinates');
+
         continue;
       }
 
