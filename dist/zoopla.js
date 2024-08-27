@@ -173,9 +173,9 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
         listingsData.push.apply(listingsData, listings);
         // remove duplicates from listings
         if (listingsData.length) {
-            listingsData = listingsData.filter((v, i, a) => a.findIndex((v2) => ['address'].every((k) => v2[k] === v[k])) === i);
             listingsData = await (0, exports.checkServiceChargeHistory)(listingsData, prisma);
-            await (0, exports.saveToDb)(listingsData, prisma);
+            if (listingsData.length)
+                await (0, exports.saveToDb)(listingsData, prisma);
             listingsData = [];
         }
         if (finishCurrentUrl) {
@@ -421,7 +421,7 @@ const saveToDb = async (listings = [], prisma) => {
             break;
         }
     }
-    console.log('Listings saved to db');
+    console.log(`${listings.length} listings saved to db`);
 };
 exports.saveToDb = saveToDb;
 const saveImage = async (listing, imageUrl, dirPath = './images') => {

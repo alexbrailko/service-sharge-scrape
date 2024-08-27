@@ -209,14 +209,9 @@ export const scrapeEachPage = async (
 
     // remove duplicates from listings
     if (listingsData.length) {
-      listingsData = listingsData.filter(
-        (v, i, a) =>
-          a.findIndex((v2) => ['address'].every((k) => v2[k] === v[k])) === i
-      );
-
       listingsData = await checkServiceChargeHistory(listingsData, prisma);
 
-      await saveToDb(listingsData, prisma);
+      if (listingsData.length) await saveToDb(listingsData, prisma);
 
       listingsData = [];
     }
@@ -530,7 +525,7 @@ export const saveToDb = async (
       break;
     }
   }
-  console.log('Listings saved to db');
+  console.log(`${listings.length} listings saved to db`);
 };
 
 export const saveImage = async (
