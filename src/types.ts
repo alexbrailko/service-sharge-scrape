@@ -5,6 +5,7 @@ export interface ListingMainPage {
   beds: number;
   baths: number;
   area: number;
+  listingPrice: number;
   datePosted: Date;
 }
 

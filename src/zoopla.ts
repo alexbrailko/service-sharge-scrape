@@ -190,12 +190,7 @@ export const scrapeEachPage = async (
 
     saveScrapedData(url, latestPostDate);
 
-    const listingsList = await scrapeListingsList(
-      priceMin,
-      priceMax,
-      prisma,
-      page
-    );
+    const listingsList = await scrapeListingsList(page);
 
     if (!listingsList.length) {
       break;
@@ -206,6 +201,8 @@ export const scrapeEachPage = async (
     listings = await scrapeListings(listingsList, browser);
 
     listingsData.push.apply(listingsData, listings);
+
+    console.log('listingsData', listingsData);
 
     // remove duplicates from listings
     if (listingsData.length) {
@@ -234,13 +231,6 @@ export const scrapeEachPage = async (
         }),
         //page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
       ]);
-      // const isLastPage = $("div[data-testid='pagination']")
-      //   .find("use[href='#arrow-right-medium']")
-      //   .parent()
-      //   .parent()
-      //   .parent()
-      //   .parent()
-      //   .attr('aria-disabled');
 
       const nextLink = await page.evaluateHandle(() => {
         const nav = document.querySelector('nav[aria-label="pagination"]');
@@ -268,12 +258,7 @@ export const scrapeEachPage = async (
   }
 };
 
-export const scrapeListingsList = async (
-  priceMin: number,
-  priceMax: number,
-  prisma: PrismaClient,
-  page: Page
-) => {
+export const scrapeListingsList = async (page: Page) => {
   const html = await page.content();
   const $ = cheerio.load(html);
 
@@ -288,24 +273,31 @@ export const scrapeListingsList = async (
     .map((index, element) => {
       const url = $(element).find('a').attr('href');
       const beds = $(element)
-        .find("use[href='#bedroom-medium']")
-        .parent()
-        .next()
-        .text();
-      const baths = $(element)
-        .find("use[href='#bathroom-medium']")
-        .parent()
-        .next()
-        .text();
-      const area = $(element)
-        .find("use[href='#dimensions-medium']")
-        .parent()
-        .next()
-        .text();
-      const date = $(element)
-        .find("li:contains('Listed on')")
+        .find("span:contains('bed')")
         .text()
-        .replace('Listed on', '');
+        .replace(/\D/g, '');
+      const baths = $(element)
+        .find("span:contains('bath')")
+        .text()
+        .replace(/\D/g, '');
+      const area = $(element)
+        .find("span:contains('sq. ft')")
+        .text()
+        .replace(/\D/g, '');
+      const date = new Date();
+
+      let listingPrice: string | number = $(element)
+        .find("p[data-testid='listing-price']")
+        .text()
+        .replace('£', '')
+        .replaceAll(',', '');
+      // if string has numbers
+      if (listingPrice.match(/^[0-9]+$/)) {
+        listingPrice = parseInt(listingPrice);
+      } else {
+        listingPrice = 0;
+      }
+
       const dateFormatted = moment(date, 'Do MMM YYYY').toDate();
       const timezoneOffset = dateFormatted.getTimezoneOffset() * 60000;
       const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
@@ -354,6 +346,7 @@ export const scrapeListingsList = async (
         baths: baths ? parseInt(baths) : null,
         area: area ? parseInt(area) : null,
         datePosted,
+        listingPrice,
       };
       // }
     })
@@ -420,21 +413,12 @@ export const scrapeListings = async (
 
     const $ = cheerio.load(html);
 
-    let listingPrice: string | number = $("p[data-testid='price']")
-      .text()
-      .replace('£', '')
-      .replaceAll(',', '');
-    // if string has numbers
-    if (listingPrice.match(/^[0-9]+$/)) {
-      listingPrice = parseInt(listingPrice);
-    } else {
-      listingPrice = 0;
-    }
-
     let serviceCharge = findServiceCharge($);
 
-    const title = $('#listing-summary-details-heading p').text();
-    const address = $('#listing-summary-details-heading address').text();
+    const title = $('div[aria-label="Listing details"] section h1 p').text();
+    const address = $(
+      'div[aria-label="Listing details"] section h1 address'
+    ).text();
 
     let addressFull = '';
     let postCode = '';
@@ -480,7 +464,7 @@ export const scrapeListings = async (
       datePosted: listings[i].datePosted,
       scrapedAt: new Date(),
       title,
-      listingPrice,
+      listingPrice: listings[i].listingPrice,
       beds: listings[i].beds,
       baths: listings[i].baths,
       area: area,
@@ -509,22 +493,22 @@ export const saveToDb = async (
   listings: ListingNoId[] = [],
   prisma: PrismaClient
 ) => {
-  for (var i = 0; i < listings.length; i++) {
-    try {
-      const savedListing = await prisma.listing.create({
-        data: listings[i],
-      });
+  // for (var i = 0; i < listings.length; i++) {
+  //   try {
+  //     const savedListing = await prisma.listing.create({
+  //       data: listings[i],
+  //     });
 
-      const imageUrl = await getMapPictureUrl(
-        savedListing.coordinates,
-        'Aerial'
-      );
-      await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
-    } catch (e) {
-      console.log('Error saving to db', e);
-      break;
-    }
-  }
+  //     const imageUrl = await getMapPictureUrl(
+  //       savedListing.coordinates,
+  //       'Aerial'
+  //     );
+  //     await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
+  //   } catch (e) {
+  //     console.log('Error saving to db', e);
+  //     break;
+  //   }
+  // }
   console.log(`${listings.length} listings saved to db`);
 };
 

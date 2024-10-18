@@ -164,13 +164,14 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
         mainUrl = newUrl;
         await (0, exports.getLatestScrapedPostDate)(prisma, priceMin, priceMax);
         (0, exports.saveScrapedData)(url, latestPostDate);
-        const listingsList = await (0, exports.scrapeListingsList)(priceMin, priceMax, prisma, page);
+        const listingsList = await (0, exports.scrapeListingsList)(page);
         if (!listingsList.length) {
             break;
         }
         let listings = [];
         listings = await (0, exports.scrapeListings)(listingsList, browser);
         listingsData.push.apply(listingsData, listings);
+        console.log('listingsData', listingsData);
         // remove duplicates from listings
         if (listingsData.length) {
             listingsData = await (0, exports.checkServiceChargeHistory)(listingsData, prisma);
@@ -193,13 +194,6 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
                 }),
                 //page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
             ]);
-            // const isLastPage = $("div[data-testid='pagination']")
-            //   .find("use[href='#arrow-right-medium']")
-            //   .parent()
-            //   .parent()
-            //   .parent()
-            //   .parent()
-            //   .attr('aria-disabled');
             const nextLink = await page.evaluateHandle(() => {
                 const nav = document.querySelector('nav[aria-label="pagination"]');
                 if (!nav)
@@ -220,7 +214,7 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
     }
 };
 exports.scrapeEachPage = scrapeEachPage;
-const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
+const scrapeListingsList = async (page) => {
     const html = await page.content();
     const $ = cheerio.load(html);
     const listingsContainer = $("div[data-testid='regular-listings']").children();
@@ -232,24 +226,30 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
         .map((index, element) => {
         const url = $(element).find('a').attr('href');
         const beds = $(element)
-            .find("use[href='#bedroom-medium']")
-            .parent()
-            .next()
-            .text();
-        const baths = $(element)
-            .find("use[href='#bathroom-medium']")
-            .parent()
-            .next()
-            .text();
-        const area = $(element)
-            .find("use[href='#dimensions-medium']")
-            .parent()
-            .next()
-            .text();
-        const date = $(element)
-            .find("li:contains('Listed on')")
+            .find("span:contains('bed')")
             .text()
-            .replace('Listed on', '');
+            .replace(/\D/g, '');
+        const baths = $(element)
+            .find("span:contains('bath')")
+            .text()
+            .replace(/\D/g, '');
+        const area = $(element)
+            .find("span:contains('sq. ft')")
+            .text()
+            .replace(/\D/g, '');
+        const date = new Date();
+        let listingPrice = $(element)
+            .find("p[data-testid='listing-price']")
+            .text()
+            .replace('£', '')
+            .replaceAll(',', '');
+        // if string has numbers
+        if (listingPrice.match(/^[0-9]+$/)) {
+            listingPrice = parseInt(listingPrice);
+        }
+        else {
+            listingPrice = 0;
+        }
         const dateFormatted = (0, moment_1.default)(date, 'Do MMM YYYY').toDate();
         const timezoneOffset = dateFormatted.getTimezoneOffset() * 60000;
         const datePosted = new Date(dateFormatted.getTime() - timezoneOffset);
@@ -285,6 +285,7 @@ const scrapeListingsList = async (priceMin, priceMax, prisma, page) => {
             baths: baths ? parseInt(baths) : null,
             area: area ? parseInt(area) : null,
             datePosted,
+            listingPrice,
         };
         // }
     })
@@ -335,20 +336,9 @@ const scrapeListings = async (listings, browser) => {
             throw new Error('Failed to scrape listings');
         }
         const $ = cheerio.load(html);
-        let listingPrice = $("p[data-testid='price']")
-            .text()
-            .replace('£', '')
-            .replaceAll(',', '');
-        // if string has numbers
-        if (listingPrice.match(/^[0-9]+$/)) {
-            listingPrice = parseInt(listingPrice);
-        }
-        else {
-            listingPrice = 0;
-        }
         let serviceCharge = (0, findData_1.findServiceCharge)($);
-        const title = $('#listing-summary-details-heading p').text();
-        const address = $('#listing-summary-details-heading address').text();
+        const title = $('div[aria-label="Listing details"] section h1 p').text();
+        const address = $('div[aria-label="Listing details"] section h1 address').text();
         let addressFull = '';
         let postCode = '';
         let coordinates = '';
@@ -387,7 +377,7 @@ const scrapeListings = async (listings, browser) => {
             datePosted: listings[i].datePosted,
             scrapedAt: new Date(),
             title,
-            listingPrice,
+            listingPrice: listings[i].listingPrice,
             beds: listings[i].beds,
             baths: listings[i].baths,
             area: area,
@@ -408,19 +398,21 @@ const scrapeListings = async (listings, browser) => {
 };
 exports.scrapeListings = scrapeListings;
 const saveToDb = async (listings = [], prisma) => {
-    for (var i = 0; i < listings.length; i++) {
-        try {
-            const savedListing = await prisma.listing.create({
-                data: listings[i],
-            });
-            const imageUrl = await (0, api_1.getMapPictureUrl)(savedListing.coordinates, 'Aerial');
-            await (0, exports.saveImage)(savedListing, imageUrl, process.env.IMAGES_PATH);
-        }
-        catch (e) {
-            console.log('Error saving to db', e);
-            break;
-        }
-    }
+    // for (var i = 0; i < listings.length; i++) {
+    //   try {
+    //     const savedListing = await prisma.listing.create({
+    //       data: listings[i],
+    //     });
+    //     const imageUrl = await getMapPictureUrl(
+    //       savedListing.coordinates,
+    //       'Aerial'
+    //     );
+    //     await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
+    //   } catch (e) {
+    //     console.log('Error saving to db', e);
+    //     break;
+    //   }
+    // }
     console.log(`${listings.length} listings saved to db`);
 };
 exports.saveToDb = saveToDb;

@@ -1,4 +1,15 @@
-import { preparePages } from './zoopla';
+import { delay } from './helpers';
+import {
+  connectPrisma,
+  initBrowser,
+  preparePages,
+  scrapeEachPage,
+  scrapeListingsList,
+} from './zoopla';
+import * as cheerio from 'cheerio';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import Adblocker from 'puppeteer-extra-plugin-adblocker';
 
 async function extractNumber() {
   const { pipeline } = await import('@xenova/transformers');
@@ -73,66 +84,105 @@ async function extractNumber() {
 //   const browser = await initBrowser();
 //   const prisma = await connectPrisma();
 //   const page = await browser.newPage();
-//   await page.goto('https://www.zoopla.co.uk/for-sale/details/66698047/', {
-//     waitUntil: 'networkidle2',
-//   });
-//   const html = await page.content();
-//   const $ = cheerio.load(html);
-//   const res = findArea($);
-//   console.log('area', res);
-//   await browser.close();
-// })();
-
-// (async () => {
-//   const browser = await initBrowser();
-//   const prisma = await connectPrisma();
-//   const page = await browser.newPage();
-
-//   const data = await prisma.listing.findMany({
-//     where: {
-//       area: null,
-//       datePosted: {
-//         gte: new Date('2023-09-30'),
-//       },
-//     },
-//     skip: 1480,
+//   const STARTING_URL =
+//     'https://www.zoopla.co.uk/for-sale/property/sw1w/?q=1%20Ebury%20Square%2C%20London%20SW1W&search_source=for-sale&pn=1&price_min=19000000&price_max=20000000&pn=1';
+//   await page.goto(STARTING_URL, {
+//     waitUntil: ['networkidle0', 'domcontentloaded'],
 //   });
 
-//   console.log('data', data.length);
+//   const res = await scrapeListingsList(page);
+//   console.log('res', res);
 
-//   for (let index = 0; index < data.length; index++) {
-//     const element = data[index];
-
-//     await page.goto(element.url, {
-//       waitUntil: 'networkidle2',
-//     });
-//     const html = await page.content();
-//     const $ = cheerio.load(html);
-//     const area = findArea($);
-//     console.log('id', element.id, '   ', index + 1);
-
-//     //const res = await getAddressData(element.coordinates);
-//     if (area) {
-//       console.log('area', area);
-
-//       await prisma.listing.update({
-//         where: {
-//           id: element.id,
-//         },
-//         data: {
-//           area: area,
-//         },
-//       });
-//       // await new Promise((resolve) => setTimeout(resolve, 300));
-//       // console.log('scraped', element.id, index);
-//     }
-//     await delay();
-//   }
-//   await browser.close();
+//   // const html = await page.content();
+//   // const $ = cheerio.load(html);
+//   // const res = findArea($);
+//   // console.log('area', res);
+//   // await browser.close();
 // })();
+
+const puppeteerArgs = {
+  headless: true,
+  // ignoreDefaultArgs: ['--enable-automation'],
+  ignoreHTTPSErrors: true,
+  slowMo: 0,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--window-size=1920,1080',
+    '--remote-debugging-port=9222',
+    '--remote-debugging-address=0.0.0.0', // You know what your doing?
+    '--disable-gpu',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--blink-settings=imagesEnabled=true',
+    '--disable-web-security',
+  ],
+};
 
 (async () => {
-  const STARTING_URL =
-    'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&pn=1';
-  await preparePages(STARTING_URL, null, null, null);
+  puppeteer.use(StealthPlugin());
+  puppeteer.use(Adblocker({ blockTrackers: true }));
+
+  const browser = await puppeteer.launch(puppeteerArgs);
+  await delay();
+  const prisma = await connectPrisma();
+
+  await delay();
+  await delay();
+  const page = await browser.newPage();
+
+  const data = await prisma.listing.findMany({
+    where: {
+      listingPrice: {
+        equals: 0,
+      },
+    },
+    orderBy: {
+      datePosted: 'desc',
+    },
+  });
+
+  console.log('data', data.length);
+
+  for (let index = 0; index < data.length; index++) {
+    const element = data[index];
+
+    await page.goto(element.url, {
+      waitUntil: 'networkidle2',
+    });
+    const html = await page.content();
+    const $ = cheerio.load(html);
+
+    let listingPrice: string | number = $('.r4q9to0 ._194zg6t3.r4q9to1')
+      .text()
+      .replace('£', '')
+      .replaceAll(',', '');
+    // if string has numbers
+    if (listingPrice.match(/^[0-9]+$/)) {
+      listingPrice = parseInt(listingPrice);
+    } else {
+      listingPrice = 0;
+    }
+
+    console.log('listingPrice', listingPrice, 'url', element.url);
+    console.log('count', index);
+
+    if (listingPrice) {
+      await prisma.listing.update({
+        where: {
+          id: element.id,
+        },
+        data: {
+          listingPrice: listingPrice,
+        },
+      });
+    }
+    await delay(2000);
+  }
+  await browser.close();
 })();
+
+// (async () => {
+//   const STARTING_URL =
+//     'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&q=London&results_sort=newest_listings&search_source=refine&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&pn=1';
+//   await preparePages(STARTING_URL, null, null, null);
+// })();
