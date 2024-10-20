@@ -141,7 +141,7 @@ export const scrapeEachPage = async (
   browser: Browser
 ) => {
   try {
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, { waitUntil: ['networkidle0', 'domcontentloaded'] });
   } catch (e) {
     console.log('Error going to url', e);
     throw new Error('Failed to load url');
@@ -158,7 +158,9 @@ export const scrapeEachPage = async (
   for (var i = 0; i < numberOfPages; i++) {
     console.log('url', mainUrl);
 
-    await page.goto(mainUrl, { waitUntil: 'networkidle2' });
+    await page.goto(mainUrl, {
+      waitUntil: ['networkidle0', 'domcontentloaded'],
+    });
 
     await delay();
     await delay();
@@ -278,6 +280,7 @@ export const scrapeListingsList = async (page: Page) => {
         .find("span:contains('bath')")
         .text()
         .replace(/\D/g, '');
+
       const area = $(element)
         .find("span:contains('sq. ft')")
         .text()
@@ -386,7 +389,9 @@ export const scrapeListings = async (
       try {
         await Promise.all([
           page.waitForNavigation(),
-          page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+          page.goto(listings[i].url, {
+            waitUntil: ['networkidle0', 'domcontentloaded'],
+          }),
         ]);
 
         html = await page.content();

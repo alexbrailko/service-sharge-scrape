@@ -124,7 +124,7 @@ const preparePages = async (firstUrl, prisma, page, browser) => {
 exports.preparePages = preparePages;
 const scrapeEachPage = async (url, prisma, page, browser) => {
     try {
-        await page.goto(url, { waitUntil: 'networkidle2' });
+        await page.goto(url, { waitUntil: ['networkidle0', 'domcontentloaded'] });
     }
     catch (e) {
         console.log('Error going to url', e);
@@ -137,7 +137,9 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
     let listingsData = [];
     for (var i = 0; i < numberOfPages; i++) {
         console.log('url', mainUrl);
-        await page.goto(mainUrl, { waitUntil: 'networkidle2' });
+        await page.goto(mainUrl, {
+            waitUntil: ['networkidle0', 'domcontentloaded'],
+        });
         await (0, helpers_1.delay)();
         await (0, helpers_1.delay)();
         try {
@@ -316,7 +318,9 @@ const scrapeListings = async (listings, browser) => {
             try {
                 await Promise.all([
                     page.waitForNavigation(),
-                    page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+                    page.goto(listings[i].url, {
+                        waitUntil: ['networkidle0', 'domcontentloaded'],
+                    }),
                 ]);
                 html = await page.content();
                 break; // Exit retry loop on successful navigation
