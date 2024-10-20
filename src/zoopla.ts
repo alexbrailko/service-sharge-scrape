@@ -202,8 +202,6 @@ export const scrapeEachPage = async (
 
     listings = await scrapeListings(listingsList, browser);
 
-    console.log('listings', listings);
-
     listingsData.push.apply(listingsData, listings);
 
     // remove duplicates from listings
