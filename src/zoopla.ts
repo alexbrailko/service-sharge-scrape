@@ -202,6 +202,8 @@ export const scrapeEachPage = async (
 
     listings = await scrapeListings(listingsList, browser);
 
+    console.log('listings', listings);
+
     listingsData.push.apply(listingsData, listings);
 
     // remove duplicates from listings
@@ -272,19 +274,6 @@ export const scrapeListingsList = async (page: Page) => {
   const listings = $(listingsContainer)
     .map((index, element) => {
       const url = $(element).find('a').attr('href');
-      const beds = $(element)
-        .find("span:contains('bed')")
-        .text()
-        .replace(/\D/g, '');
-      const baths = $(element)
-        .find("span:contains('bath')")
-        .text()
-        .replace(/\D/g, '');
-
-      const area = $(element)
-        .find("span:contains('sq. ft')")
-        .text()
-        .replace(/\D/g, '');
       const date = new Date();
 
       let listingPrice: string | number = $(element)
@@ -343,9 +332,6 @@ export const scrapeListingsList = async (page: Page) => {
       // ) {
       return {
         url: BASE_URL + url,
-        beds: beds ? parseInt(beds) : null,
-        baths: baths ? parseInt(baths) : null,
-        area: area ? parseInt(area) : null,
         datePosted,
         listingPrice,
       };
@@ -418,17 +404,39 @@ export const scrapeListings = async (
 
     let serviceCharge = findServiceCharge($);
 
-    const title = $('div[aria-label="Listing details"] section h1 p').text();
-    const address = $(
-      'div[aria-label="Listing details"] section h1 address'
-    ).text();
+    const container = $('div[aria-label="Listing details"]');
+
+    const title = $(container).find('section h1 p').text();
+    const address = $(container).find('section h1 address').text();
 
     let addressFull = '';
     let postCode = '';
     let coordinates = '';
     let groundRent = null;
-    let area = listings[i].area;
-    //let pictures = [];
+    let bedsFind = $(container)
+      .find("use[href='#bedroom-medium']")
+      .parent()
+      .parent()
+      .text();
+
+    let bathsFind = $(container)
+      .find("use[href='#bathroom-medium']")
+      .parent()
+      .parent()
+      .text();
+
+    let areaFind = $(container)
+      .find("use[href='#dimensions-medium']")
+      .parent()
+      .parent()
+      .text();
+
+    let beds = parseInt(bedsFind);
+    let baths = parseInt(bathsFind);
+    let area = parseInt(areaFind);
+    if (!area) {
+      area = findArea($);
+    }
 
     if (serviceCharge) {
       coordinates = await findCoordinates($, page);
@@ -452,10 +460,6 @@ export const scrapeListings = async (
         continue;
       }
 
-      if (!area) {
-        area = findArea($);
-      }
-
       groundRent = findGroundRent($);
 
       serviceCharge = serviceCharge > 40 ? serviceCharge : null;
@@ -468,8 +472,8 @@ export const scrapeListings = async (
       scrapedAt: new Date(),
       title,
       listingPrice: listings[i].listingPrice,
-      beds: listings[i].beds,
-      baths: listings[i].baths,
+      beds,
+      baths,
       area: area,
       address,
       addressFull,
@@ -496,22 +500,22 @@ export const saveToDb = async (
   listings: ListingNoId[] = [],
   prisma: PrismaClient
 ) => {
-  for (var i = 0; i < listings.length; i++) {
-    try {
-      const savedListing = await prisma.listing.create({
-        data: listings[i],
-      });
+  // for (var i = 0; i < listings.length; i++) {
+  //   try {
+  //     const savedListing = await prisma.listing.create({
+  //       data: listings[i],
+  //     });
 
-      const imageUrl = await getMapPictureUrl(
-        savedListing.coordinates,
-        'Aerial'
-      );
-      await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
-    } catch (e) {
-      console.log('Error saving to db', e);
-      break;
-    }
-  }
+  //     const imageUrl = await getMapPictureUrl(
+  //       savedListing.coordinates,
+  //       'Aerial'
+  //     );
+  //     await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
+  //   } catch (e) {
+  //     console.log('Error saving to db', e);
+  //     break;
+  //   }
+  // }
   console.log(`${listings.length} listings saved to db`);
 };
 

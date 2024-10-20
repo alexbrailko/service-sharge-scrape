@@ -2,9 +2,6 @@ import { Listing } from '@prisma/client';
 
 export interface ListingMainPage {
   url: string;
-  beds: number;
-  baths: number;
-  area: number;
   listingPrice: number;
   datePosted: Date;
 }
