@@ -202,8 +202,6 @@ export const scrapeEachPage = async (
 
     listingsData.push.apply(listingsData, listings);
 
-    console.log('listingsData', listingsData);
-
     // remove duplicates from listings
     if (listingsData.length) {
       listingsData = await checkServiceChargeHistory(listingsData, prisma);
@@ -493,22 +491,22 @@ export const saveToDb = async (
   listings: ListingNoId[] = [],
   prisma: PrismaClient
 ) => {
-  // for (var i = 0; i < listings.length; i++) {
-  //   try {
-  //     const savedListing = await prisma.listing.create({
-  //       data: listings[i],
-  //     });
+  for (var i = 0; i < listings.length; i++) {
+    try {
+      const savedListing = await prisma.listing.create({
+        data: listings[i],
+      });
 
-  //     const imageUrl = await getMapPictureUrl(
-  //       savedListing.coordinates,
-  //       'Aerial'
-  //     );
-  //     await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
-  //   } catch (e) {
-  //     console.log('Error saving to db', e);
-  //     break;
-  //   }
-  // }
+      const imageUrl = await getMapPictureUrl(
+        savedListing.coordinates,
+        'Aerial'
+      );
+      await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
+    } catch (e) {
+      console.log('Error saving to db', e);
+      break;
+    }
+  }
   console.log(`${listings.length} listings saved to db`);
 };
 

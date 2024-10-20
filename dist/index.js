@@ -7,7 +7,7 @@ const node_cron_1 = __importDefault(require("node-cron"));
 const zoopla_1 = require("./zoopla");
 const helpers_1 = require("./helpers");
 const BASE_URL = 'https://www.zoopla.co.uk';
-const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&search_source=refine&q=London&results_sort=newest_listings&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&property_sub_type=flats&tenure=freehold&tenure=leasehold&pn=1';
+const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&search_source=refine&q=London&results_sort=newest_listings&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&property_sub_type=flats&tenure=freehold&tenure=leasehold&is_auction=false&pn=1';
 let retryCount = 0;
 // will run every Sunday at 8:00
 node_cron_1.default.schedule('0 8 * * 7', async function () {
