@@ -1,10 +1,7 @@
-import { addExtra } from 'puppeteer-extra';
-import rebrowserPuppeteer from 'rebrowser-puppeteer';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth-fix';
-import Adblocker from 'puppeteer-extra-plugin-adblocker';
 import * as cheerio from 'cheerio';
 import moment from 'moment';
-import { Browser, Page } from 'rebrowser-puppeteer';
+import { Browser } from 'puppeteer-core';
+import { PageWithCursor as Page } from 'puppeteer-real-browser';
 
 import { Listing, PrismaClient } from '@prisma/client';
 import {
@@ -13,7 +10,6 @@ import {
   numberDifferencePercentage,
   delay,
   isNMonthsApart,
-  navigateWithRetry,
 } from './helpers';
 import { ListingMainPage, ListingNoId } from './types';
 import fs from 'fs';
@@ -25,14 +21,14 @@ import {
   findGroundRent,
   findServiceCharge,
 } from './findData';
-// import * as nodeUrl from "url";
+
 var URL = require('url').URL;
 const fetch = (...args) =>
   import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
-const puppeteer = addExtra(rebrowserPuppeteer as any);
-puppeteer.use(StealthPlugin());
-puppeteer.use(Adblocker({ blockTrackers: true }));
+// const puppeteer = addExtra(rebrowserPuppeteer as any);
+// puppeteer.use(StealthPlugin());
+// puppeteer.use(Adblocker({ blockTrackers: true }));
 
 const BASE_URL = 'https://www.zoopla.co.uk';
 const isDev = process.env.NODE_ENV === 'development';
@@ -42,33 +38,15 @@ const isDev = process.env.NODE_ENV === 'development';
 let finishCurrentUrl = false;
 let latestPostDate = null;
 
-const puppeteerArgs = {
-  headless: false,
-  // ignoreDefaultArgs: ['--enable-automation'],
-  ignoreHTTPSErrors: true,
-  slowMo: 0,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--window-size=1920,1080',
-    '--remote-debugging-port=9222',
-    '--remote-debugging-address=0.0.0.0', // You know what your doing?
-    '--disable-gpu',
-    '--disable-features=IsolateOrigins,site-per-process',
-    '--blink-settings=imagesEnabled=true',
-    '--disable-web-security',
-  ],
-};
-
-export const initBrowser = async () => {
-  try {
-    const browser = await puppeteer.launch(puppeteerArgs);
-    return browser;
-  } catch (e) {
-    console.log('Error initBrowser', e);
-    throw e;
-  }
-};
+// export const initBrowser = async () => {
+//   try {
+//     const browser = await puppeteer.launch();
+//     return browser;
+//   } catch (e) {
+//     console.log('Error initBrowser', e);
+//     throw e;
+//   }
+// };
 
 export const connectPrisma = async () => {
   const prisma = new PrismaClient();
@@ -90,10 +68,9 @@ export const agreeOnTerms = async (page: Page) => {
 
     await page.click('>>> .uc-accept-button');
   } catch (e) {
-    console.log('Error agreeOnTeerms', e);
+    console.log('Error agreeOnTerms', e);
   }
 };
-
 export const preparePages = async (
   firstUrl: string,
   prisma: PrismaClient,
@@ -371,8 +348,7 @@ export const scrapeListings = async (
 
   for (var i = 0; i < listings.length; i++) {
     let html;
-    const page =
-      (await browser.newPage()) as unknown as import('puppeteer').Page;
+    const page = await browser.newPage();
 
     for (let retry = 0; retry < 3; retry++) {
       // Retry loop with maximum 3 attempts
@@ -444,7 +420,7 @@ export const scrapeListings = async (
     }
 
     if (serviceCharge) {
-      coordinates = await findCoordinates($, page);
+      coordinates = await findCoordinates($, page as any);
 
       if (!coordinates) {
         continue;
@@ -500,7 +476,6 @@ export const scrapeListings = async (
     (listing) => listing.serviceCharge !== null && listing.serviceCharge !== 0
   );
 };
-
 export const saveToDb = async (
   listings: ListingNoId[] = [],
   prisma: PrismaClient

@@ -1,13 +1,15 @@
-import { Browser, Page } from 'rebrowser-puppeteer';
+//import { Page, Browser } from 'puppeteer-core';
+import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
+
 import cron from 'node-cron';
 import {
-  initBrowser,
   connectPrisma,
   agreeOnTerms,
   preparePages,
   readScrapedData,
 } from './zoopla';
 import { delay } from './helpers';
+import { Browser } from 'rebrowser-puppeteer-core';
 
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL =
@@ -19,14 +21,22 @@ let retryCount = 0;
 cron.schedule(
   '0 8 * * 7',
   async function () {
-    let browser: any;
-    let page: Page;
+    const { page, browser } = await connect({
+      headless: true,
+      args: [],
+      customConfig: {},
+      turnstile: true,
+      connectOption: {},
+      disableXvfb: false,
+      ignoreAllFlags: false,
+    });
 
     try {
-      browser = await initBrowser();
-      page = await browser.newPage();
-
       await start(browser, page);
+
+      await page.goto(STARTING_URL, {
+        waitUntil: ['networkidle0', 'domcontentloaded'],
+      });
     } catch (e) {
       console.error('EEE', e);
       try {
@@ -42,8 +52,8 @@ cron.schedule(
       }
 
       await delay(10000);
-      browser = await initBrowser();
-      page = await browser.newPage();
+      //await initBrowser();
+      await browser.newPage();
 
       await restart(browser, page);
     }
@@ -53,7 +63,7 @@ cron.schedule(
   }
 );
 
-const start = async (browser: Browser, page: Page) => {
+const start = async (browser, page: Page) => {
   const prisma = await connectPrisma();
   const savedUrl = readScrapedData();
   const url = savedUrl ? savedUrl : STARTING_URL;

@@ -1,13 +1,12 @@
 import { delay } from './helpers';
 import {
   connectPrisma,
-  initBrowser,
   preparePages,
   scrapeEachPage,
   scrapeListingsList,
 } from './zoopla';
 import * as cheerio from 'cheerio';
-import puppeteer from 'rebrowser-puppeteer';
+import puppeteer from 'puppeteer';
 // import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 // import Adblocker from 'puppeteer-extra-plugin-adblocker';
 

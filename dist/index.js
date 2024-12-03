@@ -3,6 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+//import { Page, Browser } from 'puppeteer-core';
+const puppeteer_real_browser_1 = require("puppeteer-real-browser");
 const node_cron_1 = __importDefault(require("node-cron"));
 const zoopla_1 = require("./zoopla");
 const helpers_1 = require("./helpers");
@@ -11,12 +13,20 @@ const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=
 let retryCount = 0;
 // will run every Sunday at 8:00
 node_cron_1.default.schedule('0 8 * * 7', async function () {
-    let browser;
-    let page;
+    const { page, browser } = await (0, puppeteer_real_browser_1.connect)({
+        headless: true,
+        args: [],
+        customConfig: {},
+        turnstile: true,
+        connectOption: {},
+        disableXvfb: false,
+        ignoreAllFlags: false,
+    });
     try {
-        browser = await (0, zoopla_1.initBrowser)();
-        page = await browser.newPage();
         await start(browser, page);
+        await page.goto(STARTING_URL, {
+            waitUntil: ['networkidle0', 'domcontentloaded'],
+        });
     }
     catch (e) {
         console.error('EEE', e);
@@ -33,8 +43,8 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
             console.log('Error browser close');
         }
         await (0, helpers_1.delay)(10000);
-        browser = await (0, zoopla_1.initBrowser)();
-        page = await browser.newPage();
+        //await initBrowser();
+        await browser.newPage();
         await restart(browser, page);
     }
 }, {

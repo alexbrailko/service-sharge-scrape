@@ -26,11 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.clearScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = exports.initBrowser = void 0;
-const puppeteer_extra_1 = require("puppeteer-extra");
-const rebrowser_puppeteer_1 = __importDefault(require("rebrowser-puppeteer"));
-const puppeteer_extra_plugin_stealth_1 = __importDefault(require("puppeteer-extra-plugin-stealth"));
-const puppeteer_extra_plugin_adblocker_1 = __importDefault(require("puppeteer-extra-plugin-adblocker"));
+exports.clearScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = void 0;
 const cheerio = __importStar(require("cheerio"));
 const moment_1 = __importDefault(require("moment"));
 const client_1 = require("@prisma/client");
@@ -39,47 +35,27 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const api_1 = require("./api");
 const findData_1 = require("./findData");
-// import * as nodeUrl from "url";
 var URL = require('url').URL;
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
-const puppeteer = (0, puppeteer_extra_1.addExtra)(rebrowser_puppeteer_1.default);
-puppeteer.use((0, puppeteer_extra_plugin_stealth_1.default)());
-puppeteer.use((0, puppeteer_extra_plugin_adblocker_1.default)({ blockTrackers: true }));
+// const puppeteer = addExtra(rebrowserPuppeteer as any);
+// puppeteer.use(StealthPlugin());
+// puppeteer.use(Adblocker({ blockTrackers: true }));
 const BASE_URL = 'https://www.zoopla.co.uk';
 const isDev = process.env.NODE_ENV === 'development';
 // let page = null;
 // let prisma = null;
 let finishCurrentUrl = false;
 let latestPostDate = null;
-const puppeteerArgs = {
-    headless: false,
-    // ignoreDefaultArgs: ['--enable-automation'],
-    ignoreHTTPSErrors: true,
-    slowMo: 0,
-    args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--window-size=1920,1080',
-        '--remote-debugging-port=9222',
-        '--remote-debugging-address=0.0.0.0', // You know what your doing?
-        '--disable-gpu',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--blink-settings=imagesEnabled=true',
-        '--disable-web-security',
-    ],
-};
-const initBrowser = async () => {
-    try {
-        const browser = await puppeteer.launch(puppeteerArgs);
-        return browser;
-    }
-    catch (e) {
-        console.log('Error initBrowser', e);
-        throw e;
-    }
-};
-exports.initBrowser = initBrowser;
+// export const initBrowser = async () => {
+//   try {
+//     const browser = await puppeteer.launch();
+//     return browser;
+//   } catch (e) {
+//     console.log('Error initBrowser', e);
+//     throw e;
+//   }
+// };
 const connectPrisma = async () => {
     const prisma = new client_1.PrismaClient();
     try {
@@ -99,7 +75,7 @@ const agreeOnTerms = async (page) => {
         await page.click('>>> .uc-accept-button');
     }
     catch (e) {
-        console.log('Error agreeOnTeerms', e);
+        console.log('Error agreeOnTerms', e);
     }
 };
 exports.agreeOnTerms = agreeOnTerms;
@@ -303,7 +279,7 @@ const scrapeListings = async (listings, browser) => {
     const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         let html;
-        const page = (await browser.newPage());
+        const page = await browser.newPage();
         for (let retry = 0; retry < 3; retry++) {
             // Retry loop with maximum 3 attempts
             try {
@@ -401,7 +377,6 @@ const scrapeListings = async (listings, browser) => {
             pictures: '',
             serviceChargeHistory: '',
         };
-        console.log('listingData', listingData);
         listingsData.push(listingData);
         await page.close();
         await (0, helpers_1.delay)();

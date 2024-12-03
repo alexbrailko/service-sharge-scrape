@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const rebrowser_puppeteer_1 = __importDefault(require("rebrowser-puppeteer"));
+const puppeteer_1 = __importDefault(require("puppeteer"));
 // import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 // import Adblocker from 'puppeteer-extra-plugin-adblocker';
 async function extractNumber() {
@@ -98,7 +98,7 @@ const puppeteerArgs = {
 (async () => {
     // puppeteer.use(StealthPlugin());
     // puppeteer.use(Adblocker({ blockTrackers: true }));
-    const browser = await rebrowser_puppeteer_1.default.launch(puppeteerArgs);
+    const browser = await puppeteer_1.default.launch(puppeteerArgs);
     const page = await browser.newPage();
     await page.goto('https://bot-detector.rebrowser.net/', {
         waitUntil: 'networkidle2',
