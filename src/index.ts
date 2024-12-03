@@ -1,4 +1,4 @@
-import { Browser, Page } from 'puppeteer';
+import { Browser, Page } from 'rebrowser-puppeteer';
 import cron from 'node-cron';
 import {
   initBrowser,
@@ -19,7 +19,7 @@ let retryCount = 0;
 cron.schedule(
   '0 8 * * 7',
   async function () {
-    let browser: Browser;
+    let browser: any;
     let page: Page;
 
     try {

@@ -27,7 +27,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.clearScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = exports.initBrowser = void 0;
-const puppeteer_extra_1 = __importDefault(require("puppeteer-extra"));
+const puppeteer_extra_1 = require("puppeteer-extra");
+const rebrowser_puppeteer_1 = __importDefault(require("rebrowser-puppeteer"));
 const puppeteer_extra_plugin_stealth_1 = __importDefault(require("puppeteer-extra-plugin-stealth"));
 const puppeteer_extra_plugin_adblocker_1 = __importDefault(require("puppeteer-extra-plugin-adblocker"));
 const cheerio = __importStar(require("cheerio"));
@@ -42,15 +43,17 @@ const findData_1 = require("./findData");
 var URL = require('url').URL;
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
-puppeteer_extra_1.default.use((0, puppeteer_extra_plugin_stealth_1.default)());
-puppeteer_extra_1.default.use((0, puppeteer_extra_plugin_adblocker_1.default)({ blockTrackers: true }));
+const puppeteer = (0, puppeteer_extra_1.addExtra)(rebrowser_puppeteer_1.default);
+puppeteer.use((0, puppeteer_extra_plugin_stealth_1.default)());
+puppeteer.use((0, puppeteer_extra_plugin_adblocker_1.default)({ blockTrackers: true }));
 const BASE_URL = 'https://www.zoopla.co.uk';
+const isDev = process.env.NODE_ENV === 'development';
 // let page = null;
 // let prisma = null;
 let finishCurrentUrl = false;
 let latestPostDate = null;
 const puppeteerArgs = {
-    headless: true,
+    headless: false,
     // ignoreDefaultArgs: ['--enable-automation'],
     ignoreHTTPSErrors: true,
     slowMo: 0,
@@ -68,7 +71,7 @@ const puppeteerArgs = {
 };
 const initBrowser = async () => {
     try {
-        const browser = await puppeteer_extra_1.default.launch(puppeteerArgs);
+        const browser = await puppeteer.launch(puppeteerArgs);
         return browser;
     }
     catch (e) {
@@ -90,10 +93,10 @@ const connectPrisma = async () => {
 exports.connectPrisma = connectPrisma;
 const agreeOnTerms = async (page) => {
     try {
-        await page.waitForSelector('#onetrust-banner-sdk', { timeout: 7000 });
+        await page.waitForSelector('#usercentrics-cmp-ui', { timeout: 7000 });
         // const frame = await elementHandle.contentFrame();
         // const button = await frame.$('#save');
-        await page.click('#onetrust-accept-btn-handler');
+        await page.click('>>> .uc-accept-button');
     }
     catch (e) {
         console.log('Error agreeOnTeerms', e);
@@ -172,13 +175,15 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
         }
         let listings = [];
         listings = await (0, exports.scrapeListings)(listingsList, browser);
-        console.log('listings', listings);
         listingsData.push.apply(listingsData, listings);
         // remove duplicates from listings
         if (listingsData.length) {
             listingsData = await (0, exports.checkServiceChargeHistory)(listingsData, prisma);
-            if (listingsData.length)
+            if (listingsData.length && !isDev)
                 await (0, exports.saveToDb)(listingsData, prisma);
+            if (listingsData.length && isDev) {
+                console.log(`${listings.length} listings saved to db`);
+            }
             listingsData = [];
         }
         if (finishCurrentUrl) {
@@ -298,7 +303,7 @@ const scrapeListings = async (listings, browser) => {
     const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         let html;
-        const page = await browser.newPage();
+        const page = (await browser.newPage());
         for (let retry = 0; retry < 3; retry++) {
             // Retry loop with maximum 3 attempts
             try {
@@ -396,6 +401,7 @@ const scrapeListings = async (listings, browser) => {
             pictures: '',
             serviceChargeHistory: '',
         };
+        console.log('listingData', listingData);
         listingsData.push(listingData);
         await page.close();
         await (0, helpers_1.delay)();
@@ -404,21 +410,19 @@ const scrapeListings = async (listings, browser) => {
 };
 exports.scrapeListings = scrapeListings;
 const saveToDb = async (listings = [], prisma) => {
-    // for (var i = 0; i < listings.length; i++) {
-    //   try {
-    //     const savedListing = await prisma.listing.create({
-    //       data: listings[i],
-    //     });
-    //     const imageUrl = await getMapPictureUrl(
-    //       savedListing.coordinates,
-    //       'Aerial'
-    //     );
-    //     await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
-    //   } catch (e) {
-    //     console.log('Error saving to db', e);
-    //     break;
-    //   }
-    // }
+    for (var i = 0; i < listings.length; i++) {
+        try {
+            const savedListing = await prisma.listing.create({
+                data: listings[i],
+            });
+            const imageUrl = await (0, api_1.getMapPictureUrl)(savedListing.coordinates, 'Aerial');
+            await (0, exports.saveImage)(savedListing, imageUrl, process.env.IMAGES_PATH);
+        }
+        catch (e) {
+            console.log('Error saving to db', e);
+            break;
+        }
+    }
     console.log(`${listings.length} listings saved to db`);
 };
 exports.saveToDb = saveToDb;

@@ -1,37 +1,11 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const helpers_1 = require("./helpers");
-const zoopla_1 = require("./zoopla");
-const cheerio = __importStar(require("cheerio"));
-const puppeteer_extra_1 = __importDefault(require("puppeteer-extra"));
-const puppeteer_extra_plugin_stealth_1 = __importDefault(require("puppeteer-extra-plugin-stealth"));
-const puppeteer_extra_plugin_adblocker_1 = __importDefault(require("puppeteer-extra-plugin-adblocker"));
+const rebrowser_puppeteer_1 = __importDefault(require("rebrowser-puppeteer"));
+// import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+// import Adblocker from 'puppeteer-extra-plugin-adblocker';
 async function extractNumber() {
     const { pipeline } = await import('@xenova/transformers');
     const pipe = await pipeline('question-answering', 'Xenova/distilbert-base-cased-distilled-squad');
@@ -105,7 +79,7 @@ async function extractNumber() {
 //   // await browser.close();
 // })();
 const puppeteerArgs = {
-    headless: true,
+    headless: false,
     // ignoreDefaultArgs: ['--enable-automation'],
     ignoreHTTPSErrors: true,
     slowMo: 0,
@@ -122,58 +96,62 @@ const puppeteerArgs = {
     ],
 };
 (async () => {
-    puppeteer_extra_1.default.use((0, puppeteer_extra_plugin_stealth_1.default)());
-    puppeteer_extra_1.default.use((0, puppeteer_extra_plugin_adblocker_1.default)({ blockTrackers: true }));
-    const browser = await puppeteer_extra_1.default.launch(puppeteerArgs);
-    await (0, helpers_1.delay)();
-    const prisma = await (0, zoopla_1.connectPrisma)();
-    await (0, helpers_1.delay)();
-    await (0, helpers_1.delay)();
+    // puppeteer.use(StealthPlugin());
+    // puppeteer.use(Adblocker({ blockTrackers: true }));
+    const browser = await rebrowser_puppeteer_1.default.launch(puppeteerArgs);
     const page = await browser.newPage();
-    const data = await prisma.listing.findMany({
-        where: {
-            listingPrice: {
-                equals: 0,
-            },
-        },
-        orderBy: {
-            datePosted: 'desc',
-        },
+    await page.goto('https://bot-detector.rebrowser.net/', {
+        waitUntil: 'networkidle2',
     });
-    console.log('data', data.length);
-    for (let index = 0; index < data.length; index++) {
-        const element = data[index];
-        await page.goto(element.url, {
-            waitUntil: 'networkidle2',
-        });
-        const html = await page.content();
-        const $ = cheerio.load(html);
-        let listingPrice = $('.r4q9to0 ._194zg6t3.r4q9to1')
-            .text()
-            .replace('£', '')
-            .replaceAll(',', '');
-        // if string has numbers
-        if (listingPrice.match(/^[0-9]+$/)) {
-            listingPrice = parseInt(listingPrice);
-        }
-        else {
-            listingPrice = 0;
-        }
-        console.log('listingPrice', listingPrice, 'url', element.url);
-        console.log('count', index);
-        if (listingPrice) {
-            await prisma.listing.update({
-                where: {
-                    id: element.id,
-                },
-                data: {
-                    listingPrice: listingPrice,
-                },
-            });
-        }
-        await (0, helpers_1.delay)(2000);
-    }
-    await browser.close();
+    console.log('page', page);
+    // await delay();
+    // const prisma = await connectPrisma();
+    // await delay();
+    // await delay();
+    // const page = await browser.newPage();
+    // const data = await prisma.listing.findMany({
+    //   where: {
+    //     listingPrice: {
+    //       equals: 0,
+    //     },
+    //   },
+    //   orderBy: {
+    //     datePosted: 'desc',
+    //   },
+    // });
+    // console.log('data', data.length);
+    // for (let index = 0; index < data.length; index++) {
+    //   const element = data[index];
+    //   await page.goto(element.url, {
+    //     waitUntil: 'networkidle2',
+    //   });
+    //   const html = await page.content();
+    //   const $ = cheerio.load(html);
+    //   let listingPrice: string | number = $('.r4q9to0 ._194zg6t3.r4q9to1')
+    //     .text()
+    //     .replace('£', '')
+    //     .replaceAll(',', '');
+    //   // if string has numbers
+    //   if (listingPrice.match(/^[0-9]+$/)) {
+    //     listingPrice = parseInt(listingPrice);
+    //   } else {
+    //     listingPrice = 0;
+    //   }
+    //   console.log('listingPrice', listingPrice, 'url', element.url);
+    //   console.log('count', index);
+    //   if (listingPrice) {
+    //     await prisma.listing.update({
+    //       where: {
+    //         id: element.id,
+    //       },
+    //       data: {
+    //         listingPrice: listingPrice,
+    //       },
+    //     });
+    //   }
+    //   await delay(2000);
+    // }
+    // await browser.close();
 })();
 // (async () => {
 //   const STARTING_URL =

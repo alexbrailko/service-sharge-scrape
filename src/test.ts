@@ -7,9 +7,9 @@ import {
   scrapeListingsList,
 } from './zoopla';
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import Adblocker from 'puppeteer-extra-plugin-adblocker';
+import puppeteer from 'rebrowser-puppeteer';
+// import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+// import Adblocker from 'puppeteer-extra-plugin-adblocker';
 
 async function extractNumber() {
   const { pipeline } = await import('@xenova/transformers');
@@ -101,7 +101,7 @@ async function extractNumber() {
 // })();
 
 const puppeteerArgs = {
-  headless: true,
+  headless: false,
   // ignoreDefaultArgs: ['--enable-automation'],
   ignoreHTTPSErrors: true,
   slowMo: 0,
@@ -119,66 +119,73 @@ const puppeteerArgs = {
 };
 
 (async () => {
-  puppeteer.use(StealthPlugin());
-  puppeteer.use(Adblocker({ blockTrackers: true }));
+  // puppeteer.use(StealthPlugin());
+  // puppeteer.use(Adblocker({ blockTrackers: true }));
 
   const browser = await puppeteer.launch(puppeteerArgs);
-  await delay();
-  const prisma = await connectPrisma();
-
-  await delay();
-  await delay();
   const page = await browser.newPage();
-
-  const data = await prisma.listing.findMany({
-    where: {
-      listingPrice: {
-        equals: 0,
-      },
-    },
-    orderBy: {
-      datePosted: 'desc',
-    },
+  await page.goto('https://bot-detector.rebrowser.net/', {
+    waitUntil: 'networkidle2',
   });
 
-  console.log('data', data.length);
+  console.log('page', page);
 
-  for (let index = 0; index < data.length; index++) {
-    const element = data[index];
+  // await delay();
+  // const prisma = await connectPrisma();
 
-    await page.goto(element.url, {
-      waitUntil: 'networkidle2',
-    });
-    const html = await page.content();
-    const $ = cheerio.load(html);
+  // await delay();
+  // await delay();
+  // const page = await browser.newPage();
 
-    let listingPrice: string | number = $('.r4q9to0 ._194zg6t3.r4q9to1')
-      .text()
-      .replace('£', '')
-      .replaceAll(',', '');
-    // if string has numbers
-    if (listingPrice.match(/^[0-9]+$/)) {
-      listingPrice = parseInt(listingPrice);
-    } else {
-      listingPrice = 0;
-    }
+  // const data = await prisma.listing.findMany({
+  //   where: {
+  //     listingPrice: {
+  //       equals: 0,
+  //     },
+  //   },
+  //   orderBy: {
+  //     datePosted: 'desc',
+  //   },
+  // });
 
-    console.log('listingPrice', listingPrice, 'url', element.url);
-    console.log('count', index);
+  // console.log('data', data.length);
 
-    if (listingPrice) {
-      await prisma.listing.update({
-        where: {
-          id: element.id,
-        },
-        data: {
-          listingPrice: listingPrice,
-        },
-      });
-    }
-    await delay(2000);
-  }
-  await browser.close();
+  // for (let index = 0; index < data.length; index++) {
+  //   const element = data[index];
+
+  //   await page.goto(element.url, {
+  //     waitUntil: 'networkidle2',
+  //   });
+  //   const html = await page.content();
+  //   const $ = cheerio.load(html);
+
+  //   let listingPrice: string | number = $('.r4q9to0 ._194zg6t3.r4q9to1')
+  //     .text()
+  //     .replace('£', '')
+  //     .replaceAll(',', '');
+  //   // if string has numbers
+  //   if (listingPrice.match(/^[0-9]+$/)) {
+  //     listingPrice = parseInt(listingPrice);
+  //   } else {
+  //     listingPrice = 0;
+  //   }
+
+  //   console.log('listingPrice', listingPrice, 'url', element.url);
+  //   console.log('count', index);
+
+  //   if (listingPrice) {
+  //     await prisma.listing.update({
+  //       where: {
+  //         id: element.id,
+  //       },
+  //       data: {
+  //         listingPrice: listingPrice,
+  //       },
+  //     });
+  //   }
+  //   await delay(2000);
+  // }
+  // await browser.close();
 })();
 
 // (async () => {

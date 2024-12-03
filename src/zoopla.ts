@@ -1,9 +1,10 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { addExtra } from 'puppeteer-extra';
+import rebrowserPuppeteer from 'rebrowser-puppeteer';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth-fix';
 import Adblocker from 'puppeteer-extra-plugin-adblocker';
 import * as cheerio from 'cheerio';
 import moment from 'moment';
-import { Browser, Page } from 'puppeteer';
+import { Browser, Page } from 'rebrowser-puppeteer';
 
 import { Listing, PrismaClient } from '@prisma/client';
 import {
@@ -29,11 +30,12 @@ var URL = require('url').URL;
 const fetch = (...args) =>
   import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
-
+const puppeteer = addExtra(rebrowserPuppeteer as any);
 puppeteer.use(StealthPlugin());
 puppeteer.use(Adblocker({ blockTrackers: true }));
 
 const BASE_URL = 'https://www.zoopla.co.uk';
+const isDev = process.env.NODE_ENV === 'development';
 
 // let page = null;
 // let prisma = null;
@@ -41,7 +43,7 @@ let finishCurrentUrl = false;
 let latestPostDate = null;
 
 const puppeteerArgs = {
-  headless: true,
+  headless: false,
   // ignoreDefaultArgs: ['--enable-automation'],
   ignoreHTTPSErrors: true,
   slowMo: 0,
@@ -81,12 +83,12 @@ export const connectPrisma = async () => {
 
 export const agreeOnTerms = async (page: Page) => {
   try {
-    await page.waitForSelector('#onetrust-banner-sdk', { timeout: 7000 });
+    await page.waitForSelector('#usercentrics-cmp-ui', { timeout: 7000 });
 
     // const frame = await elementHandle.contentFrame();
     // const button = await frame.$('#save');
 
-    await page.click('#onetrust-accept-btn-handler');
+    await page.click('>>> .uc-accept-button');
   } catch (e) {
     console.log('Error agreeOnTeerms', e);
   }
@@ -208,7 +210,11 @@ export const scrapeEachPage = async (
     if (listingsData.length) {
       listingsData = await checkServiceChargeHistory(listingsData, prisma);
 
-      if (listingsData.length) await saveToDb(listingsData, prisma);
+      if (listingsData.length && !isDev) await saveToDb(listingsData, prisma);
+
+      if (listingsData.length && isDev) {
+        console.log(`${listings.length} listings saved to db`);
+      }
 
       listingsData = [];
     }
@@ -365,7 +371,8 @@ export const scrapeListings = async (
 
   for (var i = 0; i < listings.length; i++) {
     let html;
-    const page = await browser.newPage();
+    const page =
+      (await browser.newPage()) as unknown as import('puppeteer').Page;
 
     for (let retry = 0; retry < 3; retry++) {
       // Retry loop with maximum 3 attempts
