@@ -1,5 +1,5 @@
 //import { Page, Browser } from 'puppeteer-core';
-import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
+//import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
 
 import cron from 'node-cron';
 import {
@@ -9,7 +9,8 @@ import {
   readScrapedData,
 } from './zoopla';
 import { delay } from './helpers';
-import { Browser } from 'rebrowser-puppeteer-core';
+//import puppeteer from 'puppeteer';
+import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
 
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL =
@@ -23,7 +24,11 @@ cron.schedule(
   async function () {
     const { page, browser } = await connect({
       headless: true,
-      args: [],
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      ],
       customConfig: {},
       turnstile: true,
       connectOption: {},
@@ -32,11 +37,16 @@ cron.schedule(
     });
 
     try {
+      await page.setViewport({
+        width: 1200,
+        height: 800,
+      });
+
       await start(browser, page);
 
-      await page.goto(STARTING_URL, {
-        waitUntil: ['networkidle0', 'domcontentloaded'],
-      });
+      // await page.goto(STARTING_URL, {
+      //    waitUntil: ['networkidle0', 'domcontentloaded'],
+      // });
     } catch (e) {
       console.error('EEE', e);
       try {
@@ -63,23 +73,24 @@ cron.schedule(
   }
 );
 
-const start = async (browser, page: Page) => {
+const start = async (browser, page) => {
   const prisma = await connectPrisma();
   const savedUrl = readScrapedData();
   const url = savedUrl ? savedUrl : STARTING_URL;
 
   await page.goto(BASE_URL, {
-    waitUntil: 'networkidle2',
+    waitUntil: 'domcontentloaded',
   });
 
-  await agreeOnTerms(page);
+  //await agreeOnTerms(page);
+
   await preparePages(url, prisma, page, browser);
 
   await browser.close();
   await prisma.$disconnect();
 };
 
-const restart = async (browser: Browser, page: Page) => {
+const restart = async (browser, page) => {
   try {
     // Consider exponential backoff for repeated retries:
     const delay = Math.min(2 ** retryCount * 60000, 300000); // Up to 5 minutes

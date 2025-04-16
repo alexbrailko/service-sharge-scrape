@@ -1,8 +1,8 @@
 import * as cheerio from 'cheerio';
 import moment from 'moment';
-import { Browser } from 'puppeteer-core';
+//import { Browser, Page } from 'puppeteer';
 import { PageWithCursor as Page } from 'puppeteer-real-browser';
-
+import { Browser } from 'puppeteer-core';
 import { Listing, PrismaClient } from '@prisma/client';
 import {
   updateURLParameter,
@@ -120,7 +120,9 @@ export const scrapeEachPage = async (
   browser: Browser
 ) => {
   try {
-    await page.goto(url, { waitUntil: ['networkidle0', 'domcontentloaded'] });
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+    });
   } catch (e) {
     console.log('Error going to url', e);
     throw new Error('Failed to load url');
@@ -138,7 +140,7 @@ export const scrapeEachPage = async (
     console.log('url', mainUrl);
 
     await page.goto(mainUrl, {
-      waitUntil: ['networkidle0', 'domcontentloaded'],
+      waitUntil: ['domcontentloaded'],
     });
 
     await delay();
@@ -190,7 +192,7 @@ export const scrapeEachPage = async (
       if (listingsData.length && !isDev) await saveToDb(listingsData, prisma);
 
       if (listingsData.length && isDev) {
-        console.log(`${listings.length} listings saved to db`);
+        console.log(`${listings.length} listings saved to db`, listingsData);
       }
 
       listingsData = [];
@@ -210,7 +212,7 @@ export const scrapeEachPage = async (
       await Promise.all([
         page.waitForNavigation(),
         page.goto(mainUrl, {
-          waitUntil: ['networkidle0', 'domcontentloaded'],
+          waitUntil: ['domcontentloaded'],
         }),
         //page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
       ]);
@@ -357,9 +359,11 @@ export const scrapeListings = async (
         await Promise.all([
           page.waitForNavigation(),
           page.goto(listings[i].url, {
-            waitUntil: ['networkidle0', 'domcontentloaded'],
+            waitUntil: ['domcontentloaded', 'networkidle2'],
           }),
         ]);
+
+        await delay(3000);
 
         html = await page.content();
         break; // Exit retry loop on successful navigation
@@ -387,7 +391,7 @@ export const scrapeListings = async (
 
     const container = $('div[aria-label="Listing details"]');
 
-    const title = $(container).find('section h1 p').text();
+    const title = $(container).find('section h1').text();
     const address = $(container).find('section h1 address').text();
 
     let addressFull = '';

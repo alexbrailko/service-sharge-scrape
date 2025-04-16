@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
+exports.extractLatLong = exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
 const moment_1 = __importDefault(require("moment"));
 function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -155,4 +155,21 @@ async function navigateWithRetry(page, url, errMsg) {
     console.error(`Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`);
 }
 exports.navigateWithRetry = navigateWithRetry;
+const extractLatLong = (url) => {
+    try {
+        const parsedUrl = new URL(url);
+        const pathSegments = parsedUrl.pathname.split('/');
+        const coordSegment = pathSegments[4]; // e.g., '0.023261,51.407275,13'
+        const [longitudeStr, latitudeStr] = coordSegment.split(',');
+        if (!latitudeStr || !longitudeStr) {
+            throw new Error('Invalid coordinate format in URL.');
+        }
+        return `${latitudeStr},${longitudeStr}`;
+    }
+    catch (error) {
+        console.error('Error extracting coordinates:', error.message);
+        return null;
+    }
+};
+exports.extractLatLong = extractLatLong;
 //# sourceMappingURL=helpers.js.map

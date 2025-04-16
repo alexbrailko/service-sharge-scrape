@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { Page } from 'puppeteer';
 import {
+  extractLatLong,
   extractNumberFromString,
   extractNumberFromText,
   findMatchedElement,
@@ -11,8 +12,7 @@ export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
     'srcset'
   );
 
-  const urlParams = new URLSearchParams(src);
-  const coordinates = urlParams.get('center'); //51.544505,-0.110049
+  const coordinates = extractLatLong(src); //51.544505,-0.110049
 
   return coordinates;
 };
@@ -114,7 +114,11 @@ export const findServiceCharge = ($: cheerio.CheerioAPI) => {
     serviceChargeAmount = extractNumberFromString(serviceChargeText);
   }
 
-  if (!serviceChargeAmount || serviceChargeText === 'Not available') {
+  if (
+    !serviceChargeAmount ||
+    serviceChargeText === 'Not available' ||
+    serviceChargeText === 'Ask agent'
+  ) {
     // search in features section
     if ($("div[data-testid='listing_features']")) {
       const filteredElement = findMatchedElement(

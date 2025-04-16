@@ -4,8 +4,7 @@ exports.findServiceCharge = exports.findGroundRent = exports.findArea = exports.
 const helpers_1 = require("./helpers");
 const findCoordinates = async ($, page) => {
     const src = $('section[aria-labelledby="local-area"] picture source').attr('srcset');
-    const urlParams = new URLSearchParams(src);
-    const coordinates = urlParams.get('center'); //51.544505,-0.110049
+    const coordinates = (0, helpers_1.extractLatLong)(src); //51.544505,-0.110049
     return coordinates;
 };
 exports.findCoordinates = findCoordinates;
@@ -78,7 +77,9 @@ const findServiceCharge = ($) => {
     else {
         serviceChargeAmount = (0, helpers_1.extractNumberFromString)(serviceChargeText);
     }
-    if (!serviceChargeAmount || serviceChargeText === 'Not available') {
+    if (!serviceChargeAmount ||
+        serviceChargeText === 'Not available' ||
+        serviceChargeText === 'Ask agent') {
         // search in features section
         if ($("div[data-testid='listing_features']")) {
             const filteredElement = (0, helpers_1.findMatchedElement)($, "ul[data-testid='listing_features_bulletted'] li", text);

@@ -183,3 +183,19 @@ export async function navigateWithRetry(
     `Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`
   );
 }
+
+export const extractLatLong = (url: string) => {
+  try {
+    const parsedUrl = new URL(url);
+    const pathSegments = parsedUrl.pathname.split('/');
+    const coordSegment = pathSegments[4]; // e.g., '0.023261,51.407275,13'
+    const [longitudeStr, latitudeStr] = coordSegment.split(',');
+    if (!latitudeStr || !longitudeStr) {
+      throw new Error('Invalid coordinate format in URL.');
+    }
+    return `${latitudeStr},${longitudeStr}`;
+  } catch (error) {
+    console.error('Error extracting coordinates:', error.message);
+    return null;
+  }
+};

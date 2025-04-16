@@ -103,7 +103,9 @@ const preparePages = async (firstUrl, prisma, page, browser) => {
 exports.preparePages = preparePages;
 const scrapeEachPage = async (url, prisma, page, browser) => {
     try {
-        await page.goto(url, { waitUntil: ['networkidle0', 'domcontentloaded'] });
+        await page.goto(url, {
+            waitUntil: 'domcontentloaded',
+        });
     }
     catch (e) {
         console.log('Error going to url', e);
@@ -117,7 +119,7 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
     for (var i = 0; i < numberOfPages; i++) {
         console.log('url', mainUrl);
         await page.goto(mainUrl, {
-            waitUntil: ['networkidle0', 'domcontentloaded'],
+            waitUntil: ['domcontentloaded'],
         });
         await (0, helpers_1.delay)();
         await (0, helpers_1.delay)();
@@ -158,7 +160,7 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
             if (listingsData.length && !isDev)
                 await (0, exports.saveToDb)(listingsData, prisma);
             if (listingsData.length && isDev) {
-                console.log(`${listings.length} listings saved to db`);
+                console.log(`${listings.length} listings saved to db`, listingsData);
             }
             listingsData = [];
         }
@@ -173,7 +175,7 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
             await Promise.all([
                 page.waitForNavigation(),
                 page.goto(mainUrl, {
-                    waitUntil: ['networkidle0', 'domcontentloaded'],
+                    waitUntil: ['domcontentloaded'],
                 }),
                 //page.waitForSelector("div[data-testid^='regular-listings']", { timeout: 3000 }),
             ]);
@@ -286,9 +288,10 @@ const scrapeListings = async (listings, browser) => {
                 await Promise.all([
                     page.waitForNavigation(),
                     page.goto(listings[i].url, {
-                        waitUntil: ['networkidle0', 'domcontentloaded'],
+                        waitUntil: ['domcontentloaded', 'networkidle2'],
                     }),
                 ]);
+                await (0, helpers_1.delay)(3000);
                 html = await page.content();
                 break; // Exit retry loop on successful navigation
             }
@@ -308,7 +311,7 @@ const scrapeListings = async (listings, browser) => {
         const $ = cheerio.load(html);
         let serviceCharge = (0, findData_1.findServiceCharge)($);
         const container = $('div[aria-label="Listing details"]');
-        const title = $(container).find('section h1 p').text();
+        const title = $(container).find('section h1').text();
         const address = $(container).find('section h1 address').text();
         let addressFull = '';
         let postCode = '';

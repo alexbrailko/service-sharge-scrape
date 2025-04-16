@@ -1,13 +1,15 @@
 "use strict";
+//import { Page, Browser } from 'puppeteer-core';
+//import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-//import { Page, Browser } from 'puppeteer-core';
-const puppeteer_real_browser_1 = require("puppeteer-real-browser");
 const node_cron_1 = __importDefault(require("node-cron"));
 const zoopla_1 = require("./zoopla");
 const helpers_1 = require("./helpers");
+//import puppeteer from 'puppeteer';
+const puppeteer_real_browser_1 = require("puppeteer-real-browser");
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&search_source=refine&q=London&results_sort=newest_listings&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&property_sub_type=flats&tenure=freehold&tenure=leasehold&is_auction=false&pn=1';
 let retryCount = 0;
@@ -15,7 +17,11 @@ let retryCount = 0;
 node_cron_1.default.schedule('0 8 * * 7', async function () {
     const { page, browser } = await (0, puppeteer_real_browser_1.connect)({
         headless: true,
-        args: [],
+        args: [
+            '--disable-blink-features=AutomationControlled',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        ],
         customConfig: {},
         turnstile: true,
         connectOption: {},
@@ -23,10 +29,14 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
         ignoreAllFlags: false,
     });
     try {
-        await start(browser, page);
-        await page.goto(STARTING_URL, {
-            waitUntil: ['networkidle0', 'domcontentloaded'],
+        await page.setViewport({
+            width: 1200,
+            height: 800,
         });
+        await start(browser, page);
+        // await page.goto(STARTING_URL, {
+        //    waitUntil: ['networkidle0', 'domcontentloaded'],
+        // });
     }
     catch (e) {
         console.error('EEE', e);
@@ -55,7 +65,7 @@ const start = async (browser, page) => {
     const savedUrl = (0, zoopla_1.readScrapedData)();
     const url = savedUrl ? savedUrl : STARTING_URL;
     await page.goto(BASE_URL, {
-        waitUntil: 'networkidle2',
+        waitUntil: 'domcontentloaded',
     });
     await (0, zoopla_1.agreeOnTerms)(page);
     await (0, zoopla_1.preparePages)(url, prisma, page, browser);
