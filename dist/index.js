@@ -67,7 +67,7 @@ const start = async (browser, page) => {
     await page.goto(BASE_URL, {
         waitUntil: 'domcontentloaded',
     });
-    await (0, zoopla_1.agreeOnTerms)(page);
+    //await agreeOnTerms(page);
     await (0, zoopla_1.preparePages)(url, prisma, page, browser);
     await browser.close();
     await prisma.$disconnect();
