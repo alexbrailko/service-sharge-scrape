@@ -21,6 +21,7 @@ import {
   findGroundRent,
   findServiceCharge,
 } from './findData';
+import { renderMapSnapshot } from './renderMapSnapshot';
 
 var URL = require('url').URL;
 const fetch = (...args) =>
@@ -192,7 +193,7 @@ export const scrapeEachPage = async (
       if (listingsData.length && !isDev) await saveToDb(listingsData, prisma);
 
       if (listingsData.length && isDev) {
-        console.log(`${listings.length} listings saved to db`, listingsData);
+        console.log(`${listings.length} listings saved to db`);
       }
 
       listingsData = [];
@@ -490,11 +491,16 @@ export const saveToDb = async (
         data: listings[i],
       });
 
-      const imageUrl = await getMapPictureUrl(
+      // const imageUrl = await getMapPictureUrl(
+      //   savedListing.coordinates,
+      //   'Aerial'
+      // );
+
+      await saveImage(
+        savedListing.id,
         savedListing.coordinates,
-        'Aerial'
+        process.env.IMAGES_PATH
       );
-      await saveImage(savedListing, imageUrl, process.env.IMAGES_PATH);
     } catch (e) {
       console.log('Error saving to db', e);
       break;
@@ -504,22 +510,14 @@ export const saveToDb = async (
 };
 
 export const saveImage = async (
-  listing: Listing,
-  imageUrl: string,
+  id: Listing['id'],
+  coords: Listing['coordinates'],
   dirPath: string = './images'
 ) => {
-  const filePath = path.join(dirPath, `${listing.id}.webp`);
+  const filePath = path.join(dirPath, `${id}.webp`);
 
   try {
-    const response = await fetch(imageUrl);
-    const buffer = await response.buffer();
-
-    if (!fs.existsSync(filePath)) {
-      await fs.promises.writeFile(filePath, buffer);
-      // console.log('Image downloaded and saved successfully');
-    } else {
-      console.log('Image already exists, skipping creation.');
-    }
+    await renderMapSnapshot({ coords, outputFile: filePath });
   } catch (error) {
     console.error('Image save error', error);
   }

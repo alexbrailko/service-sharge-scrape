@@ -10,6 +10,7 @@ const zoopla_1 = require("./zoopla");
 const helpers_1 = require("./helpers");
 //import puppeteer from 'puppeteer';
 const puppeteer_real_browser_1 = require("puppeteer-real-browser");
+const isDev = process.env.NODE_ENV === 'development';
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&search_source=refine&q=London&results_sort=newest_listings&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&property_sub_type=flats&tenure=freehold&tenure=leasehold&is_auction=false&pn=1';
 let retryCount = 0;
@@ -18,11 +19,15 @@ node_cron_1.default.schedule('0 8 * * 7', async function () {
     const { page, browser } = await (0, puppeteer_real_browser_1.connect)({
         headless: true,
         args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
             '--disable-blink-features=AutomationControlled',
             '--disable-features=IsolateOrigins,site-per-process',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         ],
-        customConfig: {},
+        customConfig: !isDev
+            ? { chromePath: '/usr/bin/chromium-browser' }
+            : undefined,
         turnstile: true,
         connectOption: {},
         disableXvfb: false,

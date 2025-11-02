@@ -35,6 +35,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const api_1 = require("./api");
 const findData_1 = require("./findData");
+const renderMapSnapshot_1 = require("./renderMapSnapshot");
 var URL = require('url').URL;
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
@@ -160,7 +161,7 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
             if (listingsData.length && !isDev)
                 await (0, exports.saveToDb)(listingsData, prisma);
             if (listingsData.length && isDev) {
-                console.log(`${listings.length} listings saved to db`, listingsData);
+                console.log(`${listings.length} listings saved to db`);
             }
             listingsData = [];
         }
@@ -393,8 +394,11 @@ const saveToDb = async (listings = [], prisma) => {
             const savedListing = await prisma.listing.create({
                 data: listings[i],
             });
-            const imageUrl = await (0, api_1.getMapPictureUrl)(savedListing.coordinates, 'Aerial');
-            await (0, exports.saveImage)(savedListing, imageUrl, process.env.IMAGES_PATH);
+            // const imageUrl = await getMapPictureUrl(
+            //   savedListing.coordinates,
+            //   'Aerial'
+            // );
+            await (0, exports.saveImage)(savedListing.id, savedListing.coordinates, process.env.IMAGES_PATH);
         }
         catch (e) {
             console.log('Error saving to db', e);
@@ -404,18 +408,10 @@ const saveToDb = async (listings = [], prisma) => {
     console.log(`${listings.length} listings saved to db`);
 };
 exports.saveToDb = saveToDb;
-const saveImage = async (listing, imageUrl, dirPath = './images') => {
-    const filePath = path_1.default.join(dirPath, `${listing.id}.webp`);
+const saveImage = async (id, coords, dirPath = './images') => {
+    const filePath = path_1.default.join(dirPath, `${id}.webp`);
     try {
-        const response = await fetch(imageUrl);
-        const buffer = await response.buffer();
-        if (!fs_1.default.existsSync(filePath)) {
-            await fs_1.default.promises.writeFile(filePath, buffer);
-            // console.log('Image downloaded and saved successfully');
-        }
-        else {
-            console.log('Image already exists, skipping creation.');
-        }
+        await (0, renderMapSnapshot_1.renderMapSnapshot)({ coords, outputFile: filePath });
     }
     catch (error) {
         console.error('Image save error', error);
