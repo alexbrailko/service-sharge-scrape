@@ -14,6 +14,47 @@ type SnapshotOptions = {
   retries?: number; // retry count on failure
 };
 
+// Module-scoped browser reused across calls to avoid launching many Chrome processes.
+let sharedBrowser: import('puppeteer').Browser | null = null;
+let sharedBrowserLaunching: Promise<import('puppeteer').Browser> | null = null;
+
+async function ensureSharedBrowser(defaultViewport?: {
+  width: number;
+  height: number;
+}) {
+  if (sharedBrowser) return sharedBrowser;
+  if (sharedBrowserLaunching) return sharedBrowserLaunching;
+
+  sharedBrowserLaunching = (async () => {
+    const launchOpts: import('puppeteer').LaunchOptions = {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      defaultViewport: defaultViewport ?? undefined,
+    };
+
+    const b = await puppeteer.launch(launchOpts);
+    sharedBrowser = b;
+    sharedBrowserLaunching = null;
+    return b;
+  })();
+
+  return sharedBrowserLaunching;
+}
+
+export async function closeSharedSnapshotBrowser() {
+  if (sharedBrowser) {
+    try {
+      await sharedBrowser.close();
+    } catch (e) {
+      // ignore
+    }
+    sharedBrowser = null;
+  }
+}
+
+export function getSharedSnapshotBrowser(): import('puppeteer').Browser | null {
+  return sharedBrowser;
+}
+
 export async function renderMapSnapshot(
   opts: SnapshotOptions
 ): Promise<Buffer | string> {
@@ -64,9 +105,7 @@ export async function renderMapSnapshot(
 
       // Report tile loading progress to Puppeteer by exposing a window variable
       window._tileLoadInfo = {total:0, loaded:0, errored:0};
-      tileLayer.on('loading', () => {
-        // count tiles in flight - Leaflet doesn't expose total, so we approximate by incrementing on tileloadstart
-      });
+      tileLayer.on('loading', () => {});
       map.eachLayer(layer => {
         if (layer && layer.on) {
           layer.on('tileloadstart', () => { window._tileLoadInfo.total += 1; });
@@ -82,10 +121,9 @@ export async function renderMapSnapshot(
   let attempt = 0;
   while (true) {
     attempt++;
-    const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      defaultViewport: { width, height },
-    });
+
+    // Ensure a shared browser exists and reuse it. Provide defaultViewport to ensure correct screenshot size.
+    const browser = await ensureSharedBrowser({ width, height });
 
     try {
       const page = await browser.newPage();
@@ -99,7 +137,6 @@ export async function renderMapSnapshot(
       await page.setContent(html, { waitUntil: 'domcontentloaded' });
 
       // wait for at least one tile to load by waiting for networkidle + a small delay
-      // more robust: wait until tile counts stabilize (we exposed window._tileLoadInfo)
       try {
         await page.waitForFunction(
           `window._tileLoadInfo && (window._tileLoadInfo.loaded + window._tileLoadInfo.errored) >= Math.max(1, Math.min(10, window._tileLoadInfo.total))`,
@@ -120,8 +157,11 @@ export async function renderMapSnapshot(
         type: 'webp',
       })) as Buffer;
 
-      await page.close();
-      await browser.close();
+      try {
+        await page.close();
+      } catch (e) {
+        // ignore
+      }
 
       if (outputFile) {
         const p = path.resolve(outputFile);
@@ -131,7 +171,14 @@ export async function renderMapSnapshot(
         return screenshotBuffer;
       }
     } catch (err) {
-      await browser.close().catch(() => {});
+      // do not close the shared browser here; only close page if needed. If browser is in bad state, attempt to close and reset.
+      try {
+        await sharedBrowser?.close();
+      } catch (e) {
+        // ignore
+      }
+      sharedBrowser = null;
+
       if (attempt > retries) throw err;
       // exponential backoff retry
       await new Promise((r) => setTimeout(r, 500 * attempt));
