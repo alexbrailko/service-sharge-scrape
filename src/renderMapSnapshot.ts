@@ -14,6 +14,47 @@ type SnapshotOptions = {
   retries?: number; // retry count on failure
 };
 
+// Shared browser instance for diagnostics and efficient resource use
+let sharedBrowser: import('puppeteer').Browser | null = null;
+let sharedBrowserLaunching: Promise<import('puppeteer').Browser> | null = null;
+
+async function ensureSharedBrowser(defaultViewport?: {
+  width: number;
+  height: number;
+}): Promise<import('puppeteer').Browser> {
+  if (sharedBrowser) return sharedBrowser;
+  if (sharedBrowserLaunching) return sharedBrowserLaunching;
+  sharedBrowserLaunching = (async () => {
+    const launchOpts: import('puppeteer').LaunchOptions = {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      defaultViewport: defaultViewport ?? undefined,
+    };
+    const b = await puppeteer.launch(launchOpts);
+    sharedBrowser = b;
+    sharedBrowserLaunching = null;
+    return b;
+  })();
+  return sharedBrowserLaunching;
+}
+
+export function getSharedSnapshotBrowser(): import('puppeteer').Browser | null {
+  return sharedBrowser;
+}
+
+export async function closeSharedSnapshotBrowser() {
+  if (sharedBrowser) {
+    try {
+      // Close all pages first
+      const pages = await sharedBrowser.pages();
+      await Promise.all(pages.map((page) => page.close().catch(() => {})));
+      await sharedBrowser.close();
+    } catch (e) {
+      console.error('Error closing shared snapshot browser:', e);
+    }
+    sharedBrowser = null;
+  }
+}
+
 export async function renderMapSnapshot(
   opts: SnapshotOptions
 ): Promise<Buffer | string> {
@@ -64,9 +105,7 @@ export async function renderMapSnapshot(
 
       // Report tile loading progress to Puppeteer by exposing a window variable
       window._tileLoadInfo = {total:0, loaded:0, errored:0};
-      tileLayer.on('loading', () => {
-        // count tiles in flight - Leaflet doesn't expose total, so we approximate by incrementing on tileloadstart
-      });
+      tileLayer.on('loading', () => {});
       map.eachLayer(layer => {
         if (layer && layer.on) {
           layer.on('tileloadstart', () => { window._tileLoadInfo.total += 1; });
@@ -82,47 +121,29 @@ export async function renderMapSnapshot(
   let attempt = 0;
   while (true) {
     attempt++;
-    const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      defaultViewport: { width, height },
-    });
-
+    const browser = await ensureSharedBrowser({ width, height });
     try {
       const page = await browser.newPage();
-
-      // set a friendly user-agent (some tile servers check UA)
       await page.setUserAgent(
         'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0'
       );
-
-      // set HTML
       await page.setContent(html, { waitUntil: 'domcontentloaded' });
-
-      // wait for at least one tile to load by waiting for networkidle + a small delay
-      // more robust: wait until tile counts stabilize (we exposed window._tileLoadInfo)
       try {
         await page.waitForFunction(
           `window._tileLoadInfo && (window._tileLoadInfo.loaded + window._tileLoadInfo.errored) >= Math.max(1, Math.min(10, window._tileLoadInfo.total))`,
           { timeout: 4000 }
         );
-      } catch (e) {
-        // ignore: network idle will be used as fallback
-      }
-
-      // Wait for network idle (tiles) then a little extra
+      } catch (e) {}
       await page
         .waitForNetworkIdle({ idleTime: 500, timeout: 5000 })
         .catch(() => {});
       await new Promise((r) => setTimeout(r, waitMs));
-
-      // screenshot
       const screenshotBuffer = (await page.screenshot({
         type: 'webp',
       })) as Buffer;
-
-      await page.close();
-      await browser.close();
-
+      try {
+        await page.close();
+      } catch (e) {}
       if (outputFile) {
         const p = path.resolve(outputFile);
         fs.writeFileSync(p, screenshotBuffer as unknown as Uint8Array);
@@ -131,9 +152,10 @@ export async function renderMapSnapshot(
         return screenshotBuffer;
       }
     } catch (err) {
-      await browser.close().catch(() => {});
+      try {
+        await closeSharedSnapshotBrowser();
+      } catch (e) {}
       if (attempt > retries) throw err;
-      // exponential backoff retry
       await new Promise((r) => setTimeout(r, 500 * attempt));
     }
   }

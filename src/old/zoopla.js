@@ -637,7 +637,7 @@ const zoopla = {
   },
 
   saveToDb: async function (listings = []) {
-    console.log('SAVING TO DB', listings);
+   // console.log('SAVING TO DB', listings);
     for (var i = 0; i < listings.length; i++) {
 
       try {

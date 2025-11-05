@@ -190,10 +190,10 @@ export const scrapeEachPage = async (
     if (listingsData.length) {
       listingsData = await checkServiceChargeHistory(listingsData, prisma);
 
-      if (listingsData.length && !isDev) await saveToDb(listingsData, prisma);
+      if (listingsData.length) await saveToDb(listingsData, prisma);
 
       if (listingsData.length && isDev) {
-        console.log(`${listings.length} listings saved to db`);
+        //console.log(`${listings.length} listings saved to db`);
       }
 
       listingsData = [];
@@ -647,4 +647,29 @@ export const clearScrapedDataFile = () => {
   fs.writeFile(filePath, '', function () {
     console.log('cleared scrapeData.json');
   });
+};
+
+const BATCH_SIZE = 5; // Number of parallel operations
+const PROGRESS_FILE = 'image-regeneration-progress.json';
+
+interface RegenerationProgress {
+  completedIds: string[];
+  totalCount: number;
+  lastProcessedId?: string;
+}
+
+const saveProgress = (progress: RegenerationProgress) => {
+  fs.writeFileSync(PROGRESS_FILE, JSON.stringify(progress, null, 2));
+};
+
+const loadProgress = (): RegenerationProgress | null => {
+  try {
+    if (fs.existsSync(PROGRESS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf-8'));
+      return parsed as RegenerationProgress;
+    }
+  } catch (error) {
+    console.error('Error reading progress file:', error);
+  }
+  return null;
 };
