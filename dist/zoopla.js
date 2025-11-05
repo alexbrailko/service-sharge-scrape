@@ -283,122 +283,107 @@ const scrapeListings = async (listings, browser) => {
     for (var i = 0; i < listings.length; i++) {
         let html;
         const page = await browser.newPage();
-        try {
-            for (let retry = 0; retry < 3; retry++) {
-                // Retry loop with maximum 3 attempts
-                try {
-                    await Promise.all([
-                        page.waitForNavigation(),
-                        page.goto(listings[i].url, {
-                            waitUntil: ['domcontentloaded', 'networkidle2'],
-                        }),
-                    ]);
-                    await (0, helpers_1.delay)(3000);
-                    html = await page.content();
-                    break; // Exit retry loop on successful navigation
-                }
-                catch (e) {
-                    console.log('Nav error', e);
-                    await (0, helpers_1.delay)(10000);
-                    if (retry === 2) {
-                        // rethrow so outer catch/finally can handle cleanup
-                        throw new Error(`scrapeListings Err - ${e}`);
-                    }
-                }
-            }
-            if (!html) {
-                console.error(`Failed to scrape listing: ${listings[i].url} after 3 retries.`);
-                throw new Error('Failed to scrape listings');
-            }
-            const $ = cheerio.load(html);
-            let serviceCharge = (0, findData_1.findServiceCharge)($);
-            const container = $('div[aria-label="Listing details"]');
-            const title = $(container).find('section h1').text();
-            const address = $(container).find('section h1 address').text();
-            let addressFull = '';
-            let postCode = '';
-            let coordinates = '';
-            let groundRent = null;
-            let bedsFind = $(container)
-                .find("use[href='#bedroom-medium']")
-                .parent()
-                .parent()
-                .text();
-            let bathsFind = $(container)
-                .find("use[href='#bathroom-medium']")
-                .parent()
-                .parent()
-                .text();
-            let areaFind = $(container)
-                .find("use[href='#dimensions-medium']")
-                .parent()
-                .parent()
-                .text();
-            let beds = parseInt(bedsFind);
-            let baths = parseInt(bathsFind);
-            let area = parseInt(areaFind);
-            if (!area) {
-                area = (0, findData_1.findArea)($);
-            }
-            if (serviceCharge) {
-                coordinates = await (0, findData_1.findCoordinates)($, page);
-                if (!coordinates) {
-                    continue;
-                }
-                try {
-                    const addressData = await (0, api_1.getAddressData)(coordinates);
-                    if (!addressData) {
-                        continue;
-                    }
-                    else {
-                        addressFull = addressData.addressFull;
-                        postCode = addressData.postCode;
-                        coordinates = addressData.coordinates;
-                    }
-                }
-                catch (e) {
-                    console.log('Error getAddressData', e);
-                    continue;
-                }
-                groundRent = (0, findData_1.findGroundRent)($);
-                serviceCharge = serviceCharge > 40 ? serviceCharge : null;
-            }
-            const listingData = {
-                url: listings[i]?.url,
-                type: 'flat',
-                datePosted: listings[i].datePosted,
-                scrapedAt: new Date(),
-                title,
-                listingPrice: listings[i].listingPrice,
-                beds,
-                baths,
-                area: area,
-                address,
-                addressFull,
-                postCode,
-                coordinates,
-                serviceCharge,
-                groundRent,
-                pictures: '',
-                serviceChargeHistory: '',
-            };
-            listingsData.push(listingData);
-            // end of try: page will be closed in finally below
-        }
-        catch (err) {
-            // Log the error but continue to ensure page is closed in finally
-            console.log('Error scraping listing', listings[i]?.url, err);
-            // rethrowing would abort the whole run; keep iterating but ensure cleanup
-        }
-        finally {
+        for (let retry = 0; retry < 3; retry++) {
+            // Retry loop with maximum 3 attempts
             try {
-                await page.close();
+                await Promise.all([
+                    page.waitForNavigation(),
+                    page.goto(listings[i].url, {
+                        waitUntil: ['domcontentloaded', 'networkidle2'],
+                    }),
+                ]);
+                await (0, helpers_1.delay)(3000);
+                html = await page.content();
+                break; // Exit retry loop on successful navigation
             }
             catch (e) {
-                // ignore page close errors
+                console.log('Nav error', e);
+                // await delay(10000);
+                // await page.close();
+                // await delay();
+                // await page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+                throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
             }
-            await (0, helpers_1.delay)();
         }
+        if (!html) {
+            console.error(`Failed to scrape listing: ${listings[i].url} after 3 retries.`);
+            throw new Error('Failed to scrape listings');
+        }
+        const $ = cheerio.load(html);
+        let serviceCharge = (0, findData_1.findServiceCharge)($);
+        const container = $('div[aria-label="Listing details"]');
+        const title = $(container).find('section h1').text();
+        const address = $(container).find('section h1 address').text();
+        let addressFull = '';
+        let postCode = '';
+        let coordinates = '';
+        let groundRent = null;
+        let bedsFind = $(container)
+            .find("use[href='#bedroom-medium']")
+            .parent()
+            .parent()
+            .text();
+        let bathsFind = $(container)
+            .find("use[href='#bathroom-medium']")
+            .parent()
+            .parent()
+            .text();
+        let areaFind = $(container)
+            .find("use[href='#dimensions-medium']")
+            .parent()
+            .parent()
+            .text();
+        let beds = parseInt(bedsFind);
+        let baths = parseInt(bathsFind);
+        let area = parseInt(areaFind);
+        if (!area) {
+            area = (0, findData_1.findArea)($);
+        }
+        if (serviceCharge) {
+            coordinates = await (0, findData_1.findCoordinates)($, page);
+            if (!coordinates) {
+                continue;
+            }
+            try {
+                const addressData = await (0, api_1.getAddressData)(coordinates);
+                if (!addressData) {
+                    continue;
+                }
+                else {
+                    addressFull = addressData.addressFull;
+                    postCode = addressData.postCode;
+                    coordinates = addressData.coordinates;
+                }
+            }
+            catch (e) {
+                console.log('Error getAddressData', e);
+                continue;
+            }
+            groundRent = (0, findData_1.findGroundRent)($);
+            serviceCharge = serviceCharge > 40 ? serviceCharge : null;
+        }
+        const listingData = {
+            url: listings[i]?.url,
+            type: 'flat',
+            datePosted: listings[i].datePosted,
+            scrapedAt: new Date(),
+            title,
+            listingPrice: listings[i].listingPrice,
+            beds,
+            baths,
+            area: area,
+            address,
+            addressFull,
+            postCode,
+            coordinates,
+            serviceCharge,
+            groundRent,
+            pictures: '',
+            serviceChargeHistory: '',
+        };
+        listingsData.push(listingData);
+        await page.close();
+        await (0, helpers_1.delay)();
     }
     return listingsData.filter((listing) => listing.serviceCharge !== null && listing.serviceCharge !== 0);
 };
