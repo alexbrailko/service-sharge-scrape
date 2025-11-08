@@ -121,12 +121,21 @@ export const scrapeEachPage = async (
   browser: Browser
 ) => {
   try {
+    // Set a longer timeout for navigation
+    await page.setDefaultNavigationTimeout(60000);
+
     await page.goto(url, {
       waitUntil: 'domcontentloaded',
+      timeout: 60000,
     });
   } catch (e) {
     console.log('Error going to url', e);
-    throw new Error('Failed to load url');
+    await delay(15000); // Wait before giving up
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+    } catch (reloadError) {
+      throw new Error('Failed to load url after retry');
+    }
   }
 
   const html = await page.content();
@@ -355,27 +364,37 @@ export const scrapeListings = async (
 
     for (let retry = 0; retry < 3; retry++) {
       // Retry loop with maximum 3 attempts
-
       try {
-        await Promise.all([
-          page.waitForNavigation(),
-          page.goto(listings[i].url, {
-            waitUntil: ['domcontentloaded', 'networkidle2'],
-          }),
-        ]);
+        // Set a longer timeout for navigation (60 seconds)
+        await page.setDefaultNavigationTimeout(60000);
 
-        await delay(3000);
+        // Try to navigate with more lenient conditions
+        await page.goto(listings[i].url, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60000,
+        });
+
+        // Additional delay to ensure page loads
+        await delay(5000);
 
         html = await page.content();
         break; // Exit retry loop on successful navigation
       } catch (e) {
-        console.log('Nav error', e);
-        // await delay(10000);
-        // await page.close();
-        // await delay();
-        // await page.goto(listings[i].url, { waitUntil: 'networkidle2' }),
+        console.log(`Nav error (attempt ${retry + 1}/3):`, e);
 
-        throw new Error(`scrapeListings Err - ${e}`); // Re-throw other errors
+        if (retry < 2) {
+          // Wait longer between retries (15 seconds)
+          await delay(15000);
+
+          try {
+            await page.reload({ waitUntil: 'domcontentloaded' });
+          } catch (reloadError) {
+            console.log('Reload failed, will retry with fresh navigation');
+          }
+          continue;
+        }
+
+        throw new Error(`scrapeListings Err - ${e}`);
       }
     }
 

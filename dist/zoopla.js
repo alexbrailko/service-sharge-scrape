@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.regenerateAllImages = exports.clearScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = void 0;
+exports.clearScrapedDataFile = exports.readScrapedData = exports.saveScrapedData = exports.getLatestScrapedPostDate = exports.checkServiceChargeHistory = exports.saveImage = exports.saveToDb = exports.scrapeListings = exports.scrapeListingsList = exports.scrapeEachPage = exports.preparePages = exports.agreeOnTerms = exports.connectPrisma = void 0;
 const cheerio = __importStar(require("cheerio"));
 const moment_1 = __importDefault(require("moment"));
 const client_1 = require("@prisma/client");
@@ -533,80 +533,4 @@ const loadProgress = () => {
     }
     return null;
 };
-const regenerateAllImages = async (prisma) => {
-    console.log('Starting image regeneration for all listings...');
-    try {
-        // Load previous progress if exists
-        const previousProgress = loadProgress();
-        let completedIds = previousProgress?.completedIds || [];
-        // Get all listings that have coordinates
-        const listings = await prisma.listing.findMany({
-            where: {
-                coordinates: {
-                    not: '',
-                },
-                ...(previousProgress?.lastProcessedId && {
-                    id: {
-                        gt: previousProgress.lastProcessedId,
-                    },
-                }),
-            },
-            select: {
-                id: true,
-                coordinates: true,
-            },
-            orderBy: {
-                id: 'asc',
-            },
-        });
-        const totalCount = previousProgress?.totalCount || listings.length;
-        console.log(`Found ${listings.length} listings remaining out of ${totalCount} total`);
-        // Process listings in batches
-        for (let i = 0; i < listings.length; i += BATCH_SIZE) {
-            const batch = listings.slice(i, i + BATCH_SIZE);
-            const progress = ((completedIds.length / totalCount) * 100).toFixed(2);
-            console.log(`Progress: ${progress}% (${completedIds.length}/${totalCount})`);
-            try {
-                await Promise.all(batch.map(async (listing) => {
-                    try {
-                        await (0, exports.saveImage)(listing.id, listing.coordinates, process.env.IMAGES_PATH);
-                        completedIds.push(listing.id);
-                        console.log(`Regenerated image for listing ${listing.id}`);
-                    }
-                    catch (error) {
-                        console.error(`Failed to regenerate image for listing ${listing.id}:`, error);
-                    }
-                }));
-                // Save progress after each batch
-                saveProgress({
-                    completedIds,
-                    totalCount,
-                    lastProcessedId: batch[batch.length - 1].id,
-                });
-                // Small delay between batches to prevent overwhelming the service
-                await (0, helpers_1.delay)(1000);
-            }
-            catch (error) {
-                console.error(`Error processing batch starting with ID ${batch[0].id}:`, error);
-                // Save progress even if batch fails (store the first id of the batch as lastProcessedId)
-                saveProgress({
-                    completedIds,
-                    totalCount,
-                    lastProcessedId: batch[0].id,
-                });
-            }
-        }
-        // Clean up progress file if everything completed successfully
-        if (fs_1.default.existsSync(PROGRESS_FILE)) {
-            fs_1.default.unlinkSync(PROGRESS_FILE);
-        }
-        console.log('Image regeneration completed successfully');
-        console.log(`Total images regenerated: ${completedIds.length}`);
-    }
-    catch (error) {
-        console.error('Error during image regeneration:', error);
-        throw error;
-    }
-};
-exports.regenerateAllImages = regenerateAllImages;
 //# sourceMappingURL=zoopla.js.map
