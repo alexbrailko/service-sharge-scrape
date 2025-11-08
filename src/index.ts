@@ -16,6 +16,7 @@ import {
 import { delay } from './helpers';
 //import puppeteer from 'puppeteer';
 import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
+import { exec } from 'child_process';
 
 const isDev = process.env.NODE_ENV === 'development';
 const BASE_URL = 'https://www.zoopla.co.uk';
@@ -143,7 +144,21 @@ const restart = async () => {
     retryCount++; // Increment retry count
 
     if (retryCount === 3) {
-      throw new Error('Maximum retries exceeded');
+      console.log('Maximum retries reached, restarting PM2 process...');
+      try {
+        // Run PM2 restart command
+        exec('pm2 restart scraper', (error, stdout, stderr) => {
+          if (error) {
+            console.error('Failed to restart PM2 process:', error);
+          } else {
+            console.log('PM2 restart initiated:', stdout);
+          }
+          process.exit(1); // Exit the process to ensure PM2 restarts it
+        });
+      } catch (pmError) {
+        console.error('Failed to execute PM2 restart command:', pmError);
+        process.exit(1);
+      }
     }
   }
 };
