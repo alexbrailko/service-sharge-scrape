@@ -85,8 +85,7 @@ export const getAddressDataOpenStreetMap = async (
     })
     .catch((error) => {
       console.log('Error OpenStreetMap api request:', error);
-      // Never return here, indicating an error situation
-      throw error; // Re-throw the error for potential handling elsewhere
+      return false as const; // Fall through to next provider in getAddressData chain
     });
 
   return res;

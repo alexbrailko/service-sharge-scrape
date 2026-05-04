@@ -270,7 +270,7 @@ export const scrapeListingsList = async (page: Page) => {
       const date = new Date();
 
       let listingPrice: string | number = $(element)
-        .find("p[data-testid='listing-price']")
+        .find("[class*='price_priceText__']")
         .text()
         .replace('£', '')
         .replaceAll(',', '');
