@@ -11,12 +11,6 @@ export const getAddressData = async (coordinates: string) => {
     return bingResponse;
   }
 
-  const openStreetMapData = await getAddressDataOpenStreetMap(coordinates);
-
-  if (openStreetMapData) {
-    return openStreetMapData;
-  }
-
   const geoapifyData = await getAddressDataGeoapify(coordinates);
 
   return geoapifyData;
