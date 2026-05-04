@@ -84,7 +84,7 @@ cron.schedule(
   }
 );
 
-const start = async (browser, page) => {
+const start = async (browser: any, page: any) => {
   const prisma = await connectPrisma();
   const savedUrl = readScrapedData();
   const url = savedUrl ? savedUrl : STARTING_URL;
@@ -99,7 +99,7 @@ const start = async (browser, page) => {
 
   try {
     const pages = await browser.pages();
-    await Promise.all(pages.map((p) => p.close().catch(() => {})));
+    await Promise.all(pages.map((p: any) => p.close().catch(() => {})));
     await browser.close();
     currentScraperBrowser = null;
   } catch (e) {

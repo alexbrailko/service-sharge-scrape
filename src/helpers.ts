@@ -1,11 +1,11 @@
 import moment from 'moment';
 import { Page } from 'puppeteer';
 
-export function numberWithCommas(x) {
+export function numberWithCommas(x: number | string) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-export function extractNumberFromString(string) {
+export function extractNumberFromString(string: string): number | null {
   const str = string.match(/\d+\,\d+|\d+\b|\d+(?=\w)/g);
   if (!str) return null;
   const removeCommas = str[0].replaceAll(',', '');
@@ -13,14 +13,18 @@ export function extractNumberFromString(string) {
   return parseInt(removeCommas);
 }
 
-export function findMatchedElement($, selector, matcher) {
+export function findMatchedElement(
+  $: any,
+  selector: string,
+  matcher: string
+) {
   return $(selector).filter(function () {
     const reg = new RegExp(matcher, 'ig');
     return reg.test($(this).text());
   });
 }
 
-export function isBeforeToday(date) {
+export function isBeforeToday(date: Date) {
   const today = new Date();
 
   today.setHours(0, 0, 0, 0);
@@ -28,14 +32,18 @@ export function isBeforeToday(date) {
   return date < today;
 }
 
-export function moreThanXHoursAgo(date, hours = 1) {
+export function moreThanXHoursAgo(date: number, hours = 1) {
   const HOURS = 1000 * 60 * (60 * hours);
   const hoursAgo = Date.now() - HOURS;
 
   return date < hoursAgo;
 }
 
-export function updateURLParameter(url, param, paramVal) {
+export function updateURLParameter(
+  url: string,
+  param: string,
+  paramVal: string | number
+) {
   var newAdditionalURL = '';
   var tempArray = url.split('?');
   var baseURL = tempArray[0];
@@ -81,7 +89,7 @@ export const incrementPrice = (price: number, isMax?: boolean) => {
   return newPrice;
 };
 
-export const extractNumberFromText = (el, str): number => {
+export const extractNumberFromText = (el: any, str: string): number | null => {
   const elem = el.text().toLowerCase();
   const cutText = elem.substr(elem.indexOf(str) + str.length);
   const index = cutText.indexOf('£');
@@ -96,6 +104,7 @@ export const extractNumberFromText = (el, str): number => {
 
   const newText = cutText.substring(index).substr(0, 30);
   const extractNumber = extractNumberFromString(newText);
+  if (extractNumber === null) return null;
 
   if (
     newText.includes('pm') ||
@@ -195,7 +204,10 @@ export const extractLatLong = (url: string) => {
     }
     return `${latitudeStr},${longitudeStr}`;
   } catch (error) {
-    console.error('Error extracting coordinates:', error.message);
+    console.error(
+      'Error extracting coordinates:',
+      error instanceof Error ? error.message : error
+    );
     return null;
   }
 };

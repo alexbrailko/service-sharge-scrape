@@ -197,7 +197,7 @@ export const getMapPictureUrl = async (
   coords: string,
   type: string = 'BirdsEye',
   count: number = 0
-): Promise<string> => {
+): Promise<string | undefined> => {
   try {
     const imgResponse = await fetch(
       `https://dev.virtualearth.net/REST/v1/Imagery/Map/${type}/${coords}/19?mapSize=760,460&pp=${coords};128;&mapLayer=Basemap,Buildings&key=${process.env.BING_API_KEY}`

@@ -24,8 +24,6 @@ import {
 import { renderMapSnapshot } from './renderMapSnapshot';
 
 var URL = require('url').URL;
-const fetch = (...args) =>
-  import('node-fetch').then(({ default: fetch }) => fetch(...args));
 require('dotenv').config();
 // const puppeteer = addExtra(rebrowserPuppeteer as any);
 // puppeteer.use(StealthPlugin());
@@ -37,7 +35,7 @@ const isDev = process.env.NODE_ENV === 'development';
 // let page = null;
 // let prisma = null;
 let finishCurrentUrl = false;
-let latestPostDate = null;
+let latestPostDate: Date | null = null;
 
 // export const initBrowser = async () => {
 //   try {
@@ -101,7 +99,14 @@ export const preparePages = async (
       );
     }
 
-    await scrapeEachPage(newUrl, prisma, page, browser);
+    try {
+      await scrapeEachPage(newUrl, prisma, page, browser);
+    } catch (e) {
+      console.log(
+        `Band ${priceMin}-${priceMax} failed, continuing to next band:`,
+        e
+      );
+    }
 
     if (priceMax == 10000000) {
       break;
@@ -191,7 +196,12 @@ export const scrapeEachPage = async (
 
     let listings: ListingNoId[] = [];
 
-    listings = await scrapeListings(listingsList, browser);
+    try {
+      listings = await scrapeListings(listingsList, browser);
+    } catch (e) {
+      console.log('scrapeListings batch failed, continuing pagination:', e);
+      listings = [];
+    }
 
     listingsData.push.apply(listingsData, listings);
 
@@ -232,11 +242,11 @@ export const scrapeEachPage = async (
         if (!nav) return null;
 
         return Array.from(nav.querySelectorAll('a')).find((el) =>
-          el.textContent.includes('Next')
+          el.textContent?.includes('Next')
         );
       });
-      const isLastPage = await nextLink.evaluate(
-        (el) => el.getAttribute('aria-disabled') === 'true'
+      const isLastPage = await (nextLink as any).evaluate((el: any) =>
+        el?.getAttribute('aria-disabled') === 'true'
       );
 
       if (isLastPage) {
@@ -350,155 +360,161 @@ export const scrapeListingsList = async (page: Page) => {
   }
 };
 
+type InFlightListing = Omit<ListingNoId, 'serviceCharge'> & {
+  serviceCharge: number | null;
+};
+
 export const scrapeListings = async (
   listings: ListingMainPage[],
   browser: Browser
 ): Promise<ListingNoId[]> => {
   if (!listings.length) return [];
 
-  const listingsData: ListingNoId[] = [];
+  const listingsData: InFlightListing[] = [];
 
   for (var i = 0; i < listings.length; i++) {
-    let html;
     const page = await browser.newPage();
+    try {
+      let html;
 
-    for (let retry = 0; retry < 3; retry++) {
-      // Retry loop with maximum 3 attempts
-      try {
-        // Set a longer timeout for navigation (60 seconds)
-        await page.setDefaultNavigationTimeout(60000);
-
-        // Try to navigate with more lenient conditions
-        await page.goto(listings[i].url, {
-          waitUntil: 'domcontentloaded',
-          timeout: 60000,
-        });
-
-        // Additional delay to ensure page loads
-        await delay(5000);
-
-        html = await page.content();
-        break; // Exit retry loop on successful navigation
-      } catch (e) {
-        console.log(`Nav error (attempt ${retry + 1}/3):`, e);
-
-        if (retry < 2) {
-          // Wait longer between retries (15 seconds)
-          await delay(15000);
-
-          try {
-            await page.reload({ waitUntil: 'domcontentloaded' });
-          } catch (reloadError) {
-            console.log('Reload failed, will retry with fresh navigation');
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          await page.setDefaultNavigationTimeout(60000);
+          await page.goto(listings[i].url, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60000,
+          });
+          await delay(5000);
+          html = await page.content();
+          break;
+        } catch (e) {
+          console.log(`Nav error (attempt ${retry + 1}/3):`, e);
+          if (retry < 2) {
+            await delay(15000);
+            try {
+              await page.reload({ waitUntil: 'domcontentloaded' });
+            } catch (reloadError) {
+              console.log('Reload failed, will retry with fresh navigation');
+            }
+            continue;
           }
+          throw new Error(`scrapeListings Err - ${e}`);
+        }
+      }
+
+      if (!html) {
+        console.error(
+          `Failed to scrape listing: ${listings[i].url} after 3 retries.`
+        );
+        throw new Error('Failed to scrape listings');
+      }
+
+      const $ = cheerio.load(html);
+
+      let serviceCharge = findServiceCharge($);
+
+      const container = $('div[aria-label="Listing details"]');
+
+      const title = $(container).find('section h1').text();
+      const address = $(container).find('section h1 address').text();
+
+      let addressFull = '';
+      let postCode = '';
+      let coordinates: string | null = '';
+      let groundRent: number | null = null;
+      let bedsFind = $(container)
+        .find("use[href='#bedroom-medium']")
+        .parent()
+        .parent()
+        .text();
+
+      let bathsFind = $(container)
+        .find("use[href='#bathroom-medium']")
+        .parent()
+        .parent()
+        .text();
+
+      let areaFind = $(container)
+        .find("use[href='#dimensions-medium']")
+        .parent()
+        .parent()
+        .text();
+
+      let beds = parseInt(bedsFind);
+      let baths = parseInt(bathsFind);
+      let area: number | null = parseInt(areaFind);
+      if (!area) {
+        area = findArea($);
+      }
+
+      if (serviceCharge) {
+        coordinates = await findCoordinates($, page as any);
+
+        if (!coordinates) {
           continue;
         }
 
-        throw new Error(`scrapeListings Err - ${e}`);
-      }
-    }
+        try {
+          const addressData = await getAddressData(coordinates);
 
-    if (!html) {
-      console.error(
-        `Failed to scrape listing: ${listings[i].url} after 3 retries.`
+          if (!addressData) {
+            continue;
+          } else {
+            addressFull = addressData.addressFull;
+            postCode = addressData.postCode;
+            coordinates = addressData.coordinates;
+          }
+        } catch (e) {
+          console.log('Error getAddressData', e);
+          continue;
+        }
+
+        groundRent = findGroundRent($);
+
+        serviceCharge = serviceCharge > 40 ? serviceCharge : null;
+      }
+
+      const listingData: InFlightListing = {
+        url: listings[i].url,
+        type: 'flat',
+        datePosted: listings[i].datePosted,
+        scrapedAt: new Date(),
+        title,
+        listingPrice: listings[i].listingPrice,
+        beds,
+        baths,
+        area: area,
+        address,
+        addressFull,
+        postCode,
+        coordinates,
+        serviceCharge,
+        groundRent,
+        pictures: '',
+        serviceChargeHistory: '',
+      };
+
+      listingsData.push(listingData);
+    } catch (perListingErr) {
+      // Skip this listing, but never let one bad listing kill the whole batch
+      console.log(
+        `Listing skipped (${listings[i]?.url}):`,
+        (perListingErr as Error)?.message || perListingErr
       );
-      throw new Error('Failed to scrape listings');
-    }
-
-    const $ = cheerio.load(html);
-
-    let serviceCharge = findServiceCharge($);
-
-    const container = $('div[aria-label="Listing details"]');
-
-    const title = $(container).find('section h1').text();
-    const address = $(container).find('section h1 address').text();
-
-    let addressFull = '';
-    let postCode = '';
-    let coordinates = '';
-    let groundRent = null;
-    let bedsFind = $(container)
-      .find("use[href='#bedroom-medium']")
-      .parent()
-      .parent()
-      .text();
-
-    let bathsFind = $(container)
-      .find("use[href='#bathroom-medium']")
-      .parent()
-      .parent()
-      .text();
-
-    let areaFind = $(container)
-      .find("use[href='#dimensions-medium']")
-      .parent()
-      .parent()
-      .text();
-
-    let beds = parseInt(bedsFind);
-    let baths = parseInt(bathsFind);
-    let area = parseInt(areaFind);
-    if (!area) {
-      area = findArea($);
-    }
-
-    if (serviceCharge) {
-      coordinates = await findCoordinates($, page as any);
-
-      if (!coordinates) {
-        continue;
-      }
-
+    } finally {
+      // Always close the page — guarantees no leak on continue/throw/return
       try {
-        const addressData = await getAddressData(coordinates);
-
-        if (!addressData) {
-          continue;
-        } else {
-          addressFull = addressData.addressFull;
-          postCode = addressData.postCode;
-          coordinates = addressData.coordinates;
-        }
-      } catch (e) {
-        console.log('Error getAddressData', e);
-        continue;
+        await page.close();
+      } catch (closeErr) {
+        console.log('page.close error:', closeErr);
       }
-
-      groundRent = findGroundRent($);
-
-      serviceCharge = serviceCharge > 40 ? serviceCharge : null;
     }
-
-    const listingData: ListingNoId = {
-      url: listings[i]?.url,
-      type: 'flat',
-      datePosted: listings[i].datePosted,
-      scrapedAt: new Date(),
-      title,
-      listingPrice: listings[i].listingPrice,
-      beds,
-      baths,
-      area: area,
-      address,
-      addressFull,
-      postCode,
-      coordinates,
-      serviceCharge,
-      groundRent,
-      pictures: '',
-      serviceChargeHistory: '',
-    };
-
-    listingsData.push(listingData);
-
-    await page.close();
     await delay();
   }
 
   return listingsData.filter(
     (listing) => listing.serviceCharge !== null && listing.serviceCharge !== 0
-  );
+  ) as ListingNoId[];
 };
 export const saveToDb = async (
   listings: ListingNoId[] = [],
@@ -522,7 +538,7 @@ export const saveToDb = async (
       );
     } catch (e) {
       console.log('Error saving to db', e);
-      break;
+      continue;
     }
   }
   console.log(`${listings.length} listings saved to db`);
@@ -533,6 +549,7 @@ export const saveImage = async (
   coords: Listing['coordinates'],
   dirPath: string = './images'
 ) => {
+  if (!coords) return;
   const filePath = path.join(dirPath, `${id}.webp`);
 
   try {
@@ -625,7 +642,7 @@ export const getLatestScrapedPostDate = async (
   }
 };
 
-export const saveScrapedData = (url: string, latestPostDate: Date) => {
+export const saveScrapedData = (url: string, latestPostDate: Date | null) => {
   const data = { url, latestPostDate };
   const filePath = path.join('./src/', 'scrapeData.json');
 

@@ -12,7 +12,7 @@ export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
     'srcset'
   );
 
-  const coordinates = extractLatLong(src); //51.544505,-0.110049
+  const coordinates = extractLatLong(src ?? ''); //51.544505,-0.110049
 
   return coordinates;
 };
@@ -106,12 +106,13 @@ export const findServiceCharge = ($: cheerio.CheerioAPI) => {
 
   const serviceChargeText = $(serviceChargeElem).find(' > div p').text();
 
-  let serviceChargeAmount: number = null;
+  let serviceChargeAmount: number | null = null;
+  const extractedNumber = extractNumberFromString(serviceChargeText);
 
-  if (serviceChargeText.includes('month')) {
-    serviceChargeAmount = extractNumberFromString(serviceChargeText) * 12;
+  if (serviceChargeText.includes('month') && extractedNumber !== null) {
+    serviceChargeAmount = extractedNumber * 12;
   } else {
-    serviceChargeAmount = extractNumberFromString(serviceChargeText);
+    serviceChargeAmount = extractedNumber;
   }
 
   if (
