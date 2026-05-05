@@ -26,35 +26,36 @@ const STARTING_URL =
 let retryCount = 0;
 let currentScraperBrowser: any = null;
 
+const connectScraperBrowser = async () => {
+  const conn = await connect({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    ],
+    customConfig: !isDev
+      ? { chromePath: '/usr/bin/chromium-browser' }
+      : undefined,
+    turnstile: true,
+    connectOption: {},
+    disableXvfb: false,
+    ignoreAllFlags: false,
+  });
+  currentScraperBrowser = conn.browser;
+  await conn.page.setViewport({ width: 1200, height: 800 });
+  return { browser: conn.browser, page: conn.page };
+};
+
 // will run every Sunday at 8:00
 cron.schedule(
   '0 8 * * 7',
   async function () {
-    const { page, browser } = await connect({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-      ],
-      customConfig: !isDev
-        ? { chromePath: '/usr/bin/chromium-browser' }
-        : undefined,
-      turnstile: true,
-      connectOption: {},
-      disableXvfb: false,
-      ignoreAllFlags: false,
-    });
+    const { page, browser } = await connectScraperBrowser();
 
     try {
-      currentScraperBrowser = browser;
-      await page.setViewport({
-        width: 1200,
-        height: 800,
-      });
-
       await start(browser, page);
 
       // await page.goto(STARTING_URL, {
@@ -95,7 +96,7 @@ const start = async (browser: any, page: any) => {
 
   //await agreeOnTerms(page);
 
-  await preparePages(url, prisma, page, browser);
+  await preparePages(url, prisma, page, browser, connectScraperBrowser);
 
   try {
     const pages = await browser.pages();
@@ -117,27 +118,8 @@ const restart = async () => {
     console.log(`Retrying after ${delayMs / 1000} seconds...`);
     await new Promise((resolve) => setTimeout(resolve, delayMs)); // Wait before restarting
 
-    // Re-create a fresh browser/page connection before restart
-    const conn = await connect({
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-      ],
-      customConfig: !isDev
-        ? { chromePath: '/usr/bin/chromium-browser' }
-        : undefined,
-      turnstile: true,
-      connectOption: {},
-      disableXvfb: false,
-      ignoreAllFlags: false,
-    });
-
-    currentScraperBrowser = conn.browser;
-    await start(conn.browser, conn.page);
+    const { browser, page } = await connectScraperBrowser();
+    await start(browser, page);
   } catch (error) {
     console.error('Error during restart:', error?.message || error);
   } finally {

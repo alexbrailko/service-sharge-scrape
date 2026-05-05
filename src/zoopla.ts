@@ -21,7 +21,12 @@ import {
   findGroundRent,
   findServiceCharge,
 } from './findData';
-import { renderMapSnapshot } from './renderMapSnapshot';
+import {
+  renderMapSnapshot,
+  closeSharedSnapshotBrowser,
+} from './renderMapSnapshot';
+
+const ROTATE_BROWSER_EVERY_N_BANDS = 10;
 
 var URL = require('url').URL;
 require('dotenv').config();
@@ -74,11 +79,49 @@ export const preparePages = async (
   firstUrl: string,
   prisma: PrismaClient,
   page: Page,
-  browser: Browser
+  browser: Browser,
+  reconnect?: () => Promise<{ browser: any; page: any }>
 ) => {
   let newUrl = firstUrl;
+  let currentPage: any = page;
+  let currentBrowser: any = browser;
 
   for (let index = 0; index < 97; index++) {
+    if (!currentBrowser.connected) {
+      throw new Error(
+        'Browser disconnected — aborting preparePages so cron can restart with fresh browser'
+      );
+    }
+
+    if (
+      reconnect &&
+      index > 0 &&
+      index % ROTATE_BROWSER_EVERY_N_BANDS === 0
+    ) {
+      console.log(`Rotating browser after ${index} bands`);
+      try {
+        const pages = await currentBrowser.pages();
+        await Promise.all(pages.map((p: any) => p.close().catch(() => {})));
+        await currentBrowser.close();
+      } catch (e) {
+        console.log('Error closing browser during rotation:', e);
+      }
+      try {
+        await closeSharedSnapshotBrowser();
+      } catch (e) {
+        console.log('Error closing snapshot browser during rotation:', e);
+      }
+
+      const fresh = await reconnect();
+      currentBrowser = fresh.browser;
+      currentPage = fresh.page;
+      try {
+        await currentPage.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+      } catch (e) {
+        console.log('Error navigating to BASE_URL after rotation:', e);
+      }
+    }
+
     const url = new URL(newUrl);
     const search_params = url.searchParams;
     const priceMin = parseInt(search_params.get('price_min'));
@@ -100,7 +143,7 @@ export const preparePages = async (
     }
 
     try {
-      await scrapeEachPage(newUrl, prisma, page, browser);
+      await scrapeEachPage(newUrl, prisma, currentPage, currentBrowser);
     } catch (e) {
       console.log(
         `Band ${priceMin}-${priceMax} failed, continuing to next band:`,
