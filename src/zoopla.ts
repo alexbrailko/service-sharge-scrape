@@ -152,7 +152,10 @@ export const preparePages = async (
       );
     }
 
-    if (priceMax == 10000000) {
+    // Stop once we reach the £10M ceiling. This was `== 10000000`, which never
+    // matched: incremented bands end in ...499999/...999999, so the scrape ran on
+    // for dozens of empty multi-million-pound bands (and hammered Cloudflare).
+    if (priceMax >= 10000000) {
       break;
     }
 
@@ -215,21 +218,27 @@ export const scrapeEachPage = async (
       //   - the page was blocked (Cloudflare challenge) or failed to load -> flag it.
       const sp = new URL(mainUrl).searchParams;
       const band = `${sp.get('price_min')}-${sp.get('price_max')}`;
+      let title = '';
       let reason = 'no results / not loaded';
       try {
+        title = (await page.title().catch(() => '')) || '';
+        const t = title.toLowerCase();
         const lc = (await page.content()).toLowerCase();
+        // A real Cloudflare challenge is identified by its page title and the
+        // `_cf_chl_opt` script var — body keywords alone gave false positives.
         if (
-          /just a moment|attention required|cf-chl|checking your browser|enable javascript and cookies/.test(
-            lc
-          )
+          /just a moment|attention required|verify you are human|access denied/.test(
+            t
+          ) ||
+          lc.includes('_cf_chl_opt')
         ) {
-          reason = 'BLOCKED (Cloudflare/bot challenge)';
-        } else if (/no\s*results|couldn.?t find|0 results|found 0/.test(lc)) {
+          reason = 'BLOCKED (Cloudflare challenge)';
+        } else if (/no\s*results|couldn.?t find|found 0|0 results/.test(lc)) {
           reason = 'empty band (0 results)';
         }
       } catch {}
       console.log(
-        `regular-listings not found for band ${band} — ${reason}; moving on.`
+        `regular-listings not found for band ${band} [title="${title}"] — ${reason}; moving on.`
       );
       break;
     }
