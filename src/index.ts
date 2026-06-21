@@ -14,6 +14,7 @@ import {
   readScrapedData,
 } from './zoopla';
 import { delay } from './helpers';
+import { sendWeeklyReport, sendFailureAlert } from './report';
 //import puppeteer from 'puppeteer';
 import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
 import { exec } from 'child_process';
@@ -140,6 +141,15 @@ const start = async (browser: any, page: any) => {
   }
   currentScraperBrowser = null;
   await prisma.$disconnect();
+
+  // Scrape finished — email the weekly report. Throttled internally to once/week,
+  // so the runOnInit re-scrape on every PM2 restart won't spam. Never let a report
+  // failure surface as a scrape failure.
+  try {
+    await sendWeeklyReport();
+  } catch (e) {
+    console.error('Weekly report failed:', (e as Error)?.message || e);
+  }
 };
 
 const restart = async () => {
@@ -159,6 +169,13 @@ const restart = async () => {
 
     if (retryCount === 3) {
       console.log('Maximum retries reached, restarting PM2 process...');
+      try {
+        await sendFailureAlert(
+          'Scraper failed after 3 retries; restarting the PM2 process.'
+        );
+      } catch (e) {
+        // sendFailureAlert already swallows its own errors; ignore.
+      }
       try {
         // Run PM2 restart command
         exec('pm2 restart scraper', (error, stdout, stderr) => {
