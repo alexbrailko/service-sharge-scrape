@@ -10,6 +10,7 @@ import {
   numberDifferencePercentage,
   delay,
   isNMonthsApart,
+  autoScroll,
 } from './helpers';
 import { ListingMainPage, ListingNoId } from './types';
 import fs from 'fs';
@@ -209,12 +210,28 @@ export const scrapeEachPage = async (
         timeout: 7000,
       });
     } catch (e) {
-      console.log('Error regular-listings', e);
+      // The listings container didn't render in 7s. Usually one of:
+      //   - the price band is genuinely empty (no results) -> expected, skip it;
+      //   - the page was blocked (Cloudflare challenge) or failed to load -> flag it.
+      const sp = new URL(mainUrl).searchParams;
+      const band = `${sp.get('price_min')}-${sp.get('price_max')}`;
+      let reason = 'no results / not loaded';
+      try {
+        const lc = (await page.content()).toLowerCase();
+        if (
+          /just a moment|attention required|cf-chl|checking your browser|enable javascript and cookies/.test(
+            lc
+          )
+        ) {
+          reason = 'BLOCKED (Cloudflare/bot challenge)';
+        } else if (/no\s*results|couldn.?t find|0 results|found 0/.test(lc)) {
+          reason = 'empty band (0 results)';
+        }
+      } catch {}
+      console.log(
+        `regular-listings not found for band ${band} — ${reason}; moving on.`
+      );
       break;
-      //throw new Error('Failed to load regular-listings');
-      //await browser.close();
-      //finishCurrentUrl = true;
-      // break;
     }
 
     const url = new URL(mainUrl);
@@ -428,6 +445,17 @@ export const scrapeListings = async (
             timeout: 60000,
           });
           await delay(5000);
+          // The 'Local area' map (which carries the coordinates) and other
+          // below-the-fold sections render lazily on scroll. Scroll the page and
+          // wait for the map source so it's actually in the snapshot — otherwise
+          // findCoordinates gets an empty srcset and the listing is dropped.
+          await autoScroll(page);
+          await page
+            .waitForSelector(
+              'section[aria-labelledby="local-area"] picture source',
+              { timeout: 5000 }
+            )
+            .catch(() => {});
           html = await page.content();
           break;
         } catch (e) {

@@ -12,9 +12,9 @@ export const findCoordinates = async ($: cheerio.CheerioAPI, page: Page) => {
     'srcset'
   );
 
-  const coordinates = extractLatLong(src ?? ''); //51.544505,-0.110049
-
-  return coordinates;
+  // src is undefined when the listing has no local-area map; extractLatLong
+  // handles the empty/undefined case and returns null without logging an error.
+  return extractLatLong(src); //51.544505,-0.110049
 };
 
 export const findArea = ($: cheerio.CheerioAPI) => {
@@ -66,26 +66,24 @@ export const findGroundRent = ($: cheerio.CheerioAPI) => {
 
   const groundRentText = $(groundRentElem).find(' > div p').text();
 
-  if (!groundRentText || groundRentText === 'Not available') {
-    // search in features section
-    if ($("div[data-testid='listing_features']")) {
-      const filteredElement = findMatchedElement(
-        $,
-        "ul[data-testid='listing_features_bulletted'] li",
-        text
-      );
-
-      if (filteredElement.length) {
-        return extractNumberFromText($(filteredElement), text);
-      }
-    }
-
-    // search in description
-    const filteredElement = findMatchedElement(
+  if (
+    !groundRentText ||
+    groundRentText === 'Not available' ||
+    groundRentText === 'Ask agent'
+  ) {
+    // search in the "About this property" feature bullets
+    const featureMatch = findMatchedElement(
       $,
-      "div[data-testid='truncated_text_container']",
+      'section[aria-labelledby="about"] li',
       text
     );
+
+    if (featureMatch.length) {
+      return extractNumberFromText($(featureMatch), text);
+    }
+
+    // search in the description text
+    const filteredElement = findMatchedElement($, '#detailed-desc', text);
 
     if (filteredElement.length) {
       return extractNumberFromText($(filteredElement), text);
@@ -120,24 +118,18 @@ export const findServiceCharge = ($: cheerio.CheerioAPI) => {
     serviceChargeText === 'Not available' ||
     serviceChargeText === 'Ask agent'
   ) {
-    // search in features section
-    if ($("div[data-testid='listing_features']")) {
-      const filteredElement = findMatchedElement(
-        $,
-        "ul[data-testid='listing_features_bulletted'] li",
-        text
-      );
-      if (filteredElement.length) {
-        return extractNumberFromText($(filteredElement), text);
-      }
-    }
-
-    // search in description
-    const filteredElement = findMatchedElement(
+    // search in the "About this property" feature bullets
+    const featureMatch = findMatchedElement(
       $,
-      "div[data-testid='truncated_text_container']",
+      'section[aria-labelledby="about"] li',
       text
     );
+    if (featureMatch.length) {
+      return extractNumberFromText($(featureMatch), text);
+    }
+
+    // search in the description text
+    const filteredElement = findMatchedElement($, '#detailed-desc', text);
 
     if (filteredElement.length) {
       return extractNumberFromText($(filteredElement), text);

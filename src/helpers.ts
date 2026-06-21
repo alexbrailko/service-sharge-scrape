@@ -193,14 +193,59 @@ export async function navigateWithRetry(
   );
 }
 
-export const extractLatLong = (url: string) => {
+// Listing detail pages lazy-load below-the-fold widgets (the 'Local area' map,
+// points of interest, etc.) only once scrolled into view. Scroll through the
+// page so those sections render into the DOM before we snapshot page.content().
+export async function autoScroll(page: any) {
   try {
+    await page.evaluate(async () => {
+      await new Promise<void>((resolve) => {
+        let total = 0;
+        let ticks = 0;
+        const step = 600;
+        const timer = setInterval(() => {
+          window.scrollBy(0, step);
+          total += step;
+          ticks += 1;
+          // stop at the bottom, or after a hard cap (~9s) so we never hang
+          if (
+            total >= document.body.scrollHeight - window.innerHeight ||
+            ticks > 60
+          ) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 150);
+      });
+    });
+  } catch (e) {
+    // non-fatal — proceed with whatever rendered
+  }
+}
+
+export const extractLatLong = (srcset: string | undefined | null) => {
+  if (!srcset) return null; // no local-area map on this listing — not an error
+
+  try {
+    // `srcset` may carry an image descriptor or several candidates
+    // ("url 2x" or "url1 1x, url2 2x"). The map URL itself contains commas
+    // (lon,lat,zoom), so split on whitespace and take the first URL token.
+    let url = srcset.trim().split(/\s+/)[0];
+    if (!url) return null;
+    if (url.startsWith('//')) url = 'https:' + url; // protocol-relative URL
+
     const parsedUrl = new URL(url);
-    const pathSegments = parsedUrl.pathname.split('/');
-    const coordSegment = pathSegments[4]; // e.g., '0.023261,51.407275,13'
+    const coordSegment = parsedUrl.pathname.split('/')[4]; // e.g. '0.023261,51.407275,13'
+    if (!coordSegment) return null;
+
     const [longitudeStr, latitudeStr] = coordSegment.split(',');
-    if (!latitudeStr || !longitudeStr) {
-      throw new Error('Invalid coordinate format in URL.');
+    if (
+      !latitudeStr ||
+      !longitudeStr ||
+      isNaN(parseFloat(latitudeStr)) ||
+      isNaN(parseFloat(longitudeStr))
+    ) {
+      return null;
     }
     return `${latitudeStr},${longitudeStr}`;
   } catch (error) {
