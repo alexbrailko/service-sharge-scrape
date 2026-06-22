@@ -12,26 +12,26 @@ export interface MailInput {
 }
 
 export async function sendMail({ to, subject, html, text }: MailInput): Promise<void> {
-  if (!process.env.INFO_EMAIL || !process.env.INFO_EMAIL_PASSWORD) {
+  // Fully env-configurable so the SMTP server can be changed without a code change.
+  // Falls back to the old INFO_EMAIL creds for backwards-compatibility.
+  const host = process.env.SMTP_HOST || 'mail.service-charge.co.uk';
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const user = process.env.SMTP_USER || process.env.INFO_EMAIL;
+  const pass = process.env.SMTP_PASS || process.env.INFO_EMAIL_PASSWORD;
+  const from = process.env.SMTP_FROM || user;
+
+  if (!host || !user || !pass) {
     throw new Error(
-      'INFO_EMAIL / INFO_EMAIL_PASSWORD not set — add them to the scraper .env'
+      'SMTP not configured — set SMTP_HOST / SMTP_USER / SMTP_PASS (and SMTP_FROM) in the scraper .env'
     );
   }
 
   const transport = nodemailer.createTransport({
-    host: 'mail.service-charge.co.uk',
-    port: 587,
-    auth: {
-      user: process.env.INFO_EMAIL,
-      pass: process.env.INFO_EMAIL_PASSWORD,
-    },
+    host,
+    port,
+    secure: port === 465, // 465 = implicit TLS; 587 = STARTTLS
+    auth: { user, pass },
   });
 
-  await transport.sendMail({
-    from: process.env.INFO_EMAIL,
-    to,
-    subject,
-    html,
-    text,
-  });
+  await transport.sendMail({ from, to, subject, html, text });
 }
