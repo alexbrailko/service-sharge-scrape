@@ -50,7 +50,7 @@ const killStrayChrome = async () => {
 
 const connectScraperBrowser = async () => {
   const conn = await connect({
-    headless: true,
+    headless: false,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
