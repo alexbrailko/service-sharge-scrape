@@ -14,7 +14,8 @@ import {
   readScrapedData,
   BLOCK_ABORT_MESSAGE,
 } from './zoopla';
-import { delay } from './helpers';
+import { delay, ensureDir } from './helpers';
+import { hardenPage, hardenBrowser } from './hardenPage';
 import { sendWeeklyReport, sendFailureAlert } from './report';
 //import puppeteer from 'puppeteer';
 import { connect, PageWithCursor as Page } from 'puppeteer-real-browser';
@@ -24,6 +25,7 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 const isDev = process.env.NODE_ENV === 'development';
+const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || '';
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL =
   'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&search_source=refine&q=London&results_sort=newest_listings&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&property_sub_type=flats&tenure=freehold&tenure=leasehold&is_auction=false&pn=1';
@@ -43,29 +45,43 @@ const killStrayChrome = async () => {
   try {
     await execAsync("pkill -f '[u]ser-data-dir=/tmp/lighthouse' || true");
     await execAsync('rm -rf /tmp/lighthouse.* || true');
+    if (PROFILE_DIR) {
+      const escaped = PROFILE_DIR.replace(/^(.)/, '[$1]');
+      await execAsync(`pkill -f 'user-data-dir=${escaped}' || true`);
+    }
   } catch (e) {
     console.log('killStrayChrome (non-fatal):', (e as Error)?.message || e);
   }
 };
 
+export const buildCustomConfig = () => {
+  const config: Record<string, unknown> = {};
+  if (!isDev) config.chromePath = '/usr/bin/chromium-browser';
+  if (PROFILE_DIR) {
+    ensureDir(PROFILE_DIR);
+    config.userDataDir = PROFILE_DIR;
+  }
+  return Object.keys(config).length ? config : undefined;
+};
+
 const connectScraperBrowser = async () => {
   const conn = await connect({
-    headless: false,
+    headless: true,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-blink-features=AutomationControlled',
       '--disable-features=IsolateOrigins,site-per-process',
     ],
-    customConfig: !isDev
-      ? { chromePath: '/usr/bin/chromium-browser' }
-      : undefined,
+    customConfig: buildCustomConfig(),
     turnstile: true,
     connectOption: {},
     disableXvfb: false,
     ignoreAllFlags: false,
   });
   currentScraperBrowser = conn.browser;
+  await hardenBrowser(conn.browser);
+  await hardenPage(conn.page);
   await conn.page.setViewport({ width: 1200, height: 800 });
   return { browser: conn.browser, page: conn.page };
 };
@@ -128,7 +144,10 @@ cron.schedule(
 );
 
 const start = async (browser: any, page: any, scheduled = false) => {
-  const prisma = await connectPrisma();
+  const prisma = isDev ? null : await connectPrisma();
+  if (isDev) {
+    console.log('[dev] running without a database — scraped data will be logged');
+  }
   const savedUrl = readScrapedData();
   const url = savedUrl ? savedUrl : STARTING_URL;
 
@@ -149,11 +168,16 @@ const start = async (browser: any, page: any, scheduled = false) => {
     // ignore
   }
   currentScraperBrowser = null;
-  await prisma.$disconnect();
+  if (prisma) await prisma.$disconnect();
 
   // Scrape finished — email the weekly report. Throttled internally to once/week,
   // so the runOnInit re-scrape on every PM2 restart won't spam. Never let a report
   // failure surface as a scrape failure.
+  if (isDev) {
+    console.log('[dev] skipping weekly report');
+    return;
+  }
+
   try {
     await sendWeeklyReport({ scheduled });
   } catch (e) {

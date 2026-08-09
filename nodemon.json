@@ -1,0 +1,14 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": [
+    "src/scrapeData.json",
+    "src/images/**",
+    ".chrome-profile/**",
+    "dist/**",
+    "images/**",
+    "report-state.json",
+    "image-regeneration-progress.json"
+  ],
+  "delay": 1000
+}

@@ -10,3 +10,4 @@ src/images
 src/test.ts
 src/scrapeData.json
 report-state.json
+.chrome-profile/

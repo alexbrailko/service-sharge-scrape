@@ -5,11 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildCustomConfig = void 0;
 const node_cron_1 = __importDefault(require("node-cron"));
 const diagnostics_1 = require("./diagnostics");
 const renderMapSnapshot_1 = require("./renderMapSnapshot");
 const zoopla_1 = require("./zoopla");
 const helpers_1 = require("./helpers");
+const hardenPage_1 = require("./hardenPage");
 const report_1 = require("./report");
 //import puppeteer from 'puppeteer';
 const puppeteer_real_browser_1 = require("puppeteer-real-browser");
@@ -17,6 +19,7 @@ const child_process_1 = require("child_process");
 const util_1 = require("util");
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
 const isDev = process.env.NODE_ENV === 'development';
+const PROFILE_DIR = process.env.CHROME_PROFILE_DIR || '';
 const BASE_URL = 'https://www.zoopla.co.uk';
 const STARTING_URL = 'https://www.zoopla.co.uk/for-sale/flats/london/?page_size=25&search_source=for-sale&search_source=refine&q=London&results_sort=newest_listings&is_shared_ownership=false&is_retirement_home=false&price_min=50000&price_max=99999&property_sub_type=flats&tenure=freehold&tenure=leasehold&is_auction=false&pn=1';
 let retryCount = 0;
@@ -32,13 +35,28 @@ const killStrayChrome = async () => {
     if (process.platform !== 'linux')
         return;
     try {
-        await execAsync("pkill -f 'user-data-dir=/tmp/lighthouse' || true");
+        await execAsync("pkill -f '[u]ser-data-dir=/tmp/lighthouse' || true");
         await execAsync('rm -rf /tmp/lighthouse.* || true');
+        if (PROFILE_DIR) {
+            const escaped = PROFILE_DIR.replace(/^(.)/, '[$1]');
+            await execAsync(`pkill -f 'user-data-dir=${escaped}' || true`);
+        }
     }
     catch (e) {
         console.log('killStrayChrome (non-fatal):', e?.message || e);
     }
 };
+const buildCustomConfig = () => {
+    const config = {};
+    if (!isDev)
+        config.chromePath = '/usr/bin/chromium-browser';
+    if (PROFILE_DIR) {
+        (0, helpers_1.ensureDir)(PROFILE_DIR);
+        config.userDataDir = PROFILE_DIR;
+    }
+    return Object.keys(config).length ? config : undefined;
+};
+exports.buildCustomConfig = buildCustomConfig;
 const connectScraperBrowser = async () => {
     const conn = await (0, puppeteer_real_browser_1.connect)({
         headless: true,
@@ -47,17 +65,16 @@ const connectScraperBrowser = async () => {
             '--disable-setuid-sandbox',
             '--disable-blink-features=AutomationControlled',
             '--disable-features=IsolateOrigins,site-per-process',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         ],
-        customConfig: !isDev
-            ? { chromePath: '/usr/bin/chromium-browser' }
-            : undefined,
+        customConfig: (0, exports.buildCustomConfig)(),
         turnstile: true,
         connectOption: {},
         disableXvfb: false,
         ignoreAllFlags: false,
     });
     currentScraperBrowser = conn.browser;
+    await (0, hardenPage_1.hardenBrowser)(conn.browser);
+    await (0, hardenPage_1.hardenPage)(conn.page);
     await conn.page.setViewport({ width: 1200, height: 800 });
     return { browser: conn.browser, page: conn.page };
 };

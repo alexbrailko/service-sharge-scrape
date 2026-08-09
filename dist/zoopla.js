@@ -36,12 +36,38 @@ const path_1 = __importDefault(require("path"));
 const api_1 = require("./api");
 const findData_1 = require("./findData");
 const renderMapSnapshot_1 = require("./renderMapSnapshot");
+const hardenPage_1 = require("./hardenPage");
 const ROTATE_BROWSER_EVERY_N_BANDS = 10;
 const MAX_CONSECUTIVE_BLOCKS = 5;
 const MAX_CONSECUTIVE_EMPTY_BANDS = 6;
 const BLOCK_BACKOFF_BASE_MS = 60000;
 const BLOCK_BACKOFF_MAX_MS = 15 * 60000;
+const CHALLENGE_CLEAR_TIMEOUT_MS = 45000;
+const CHALLENGE_POLL_MS = 2000;
+const CHALLENGE_RETRY_SELECTOR_MS = 15000;
 exports.BLOCK_ABORT_MESSAGE = 'consecutive Cloudflare challenges';
+const isChallengePage = async (page) => {
+    try {
+        const title = ((await page.title()) || '').toLowerCase();
+        if (/just a moment|attention required|verify you are human|access denied/.test(title)) {
+            return true;
+        }
+        const content = (await page.content()).toLowerCase();
+        return content.includes('_cf_chl_opt');
+    }
+    catch {
+        return false;
+    }
+};
+const waitForChallengeToClear = async (page) => {
+    const deadline = Date.now() + CHALLENGE_CLEAR_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+        await (0, helpers_1.delay)(CHALLENGE_POLL_MS);
+        if (!(await isChallengePage(page)))
+            return true;
+    }
+    return false;
+};
 let runStats = {
     bandsScanned: 0,
     bandsBlocked: 0,
@@ -252,26 +278,42 @@ const scrapeEachPage = async (url, prisma, page, browser) => {
             //   - the page was blocked (Cloudflare challenge) or failed to load -> flag it.
             const sp = new URL(mainUrl).searchParams;
             const band = `${sp.get('price_min')}-${sp.get('price_max')}`;
-            let title = '';
-            let reason = 'no results / not loaded';
-            try {
-                title = (await page.title().catch(() => '')) || '';
-                const t = title.toLowerCase();
-                const lc = (await page.content()).toLowerCase();
-                // A real Cloudflare challenge is identified by its page title and the
-                // `_cf_chl_opt` script var — body keywords alone gave false positives.
-                if (/just a moment|attention required|verify you are human|access denied/.test(t) ||
-                    lc.includes('_cf_chl_opt')) {
-                    blocked = true;
-                    reason = 'BLOCKED (Cloudflare challenge)';
+            if (await isChallengePage(page)) {
+                console.log(`Cloudflare challenge on band ${band} — waiting up to ${CHALLENGE_CLEAR_TIMEOUT_MS / 1000}s for it to clear`);
+                if (await waitForChallengeToClear(page)) {
+                    try {
+                        await page.waitForSelector("div[data-testid='regular-listings']", {
+                            timeout: CHALLENGE_RETRY_SELECTOR_MS,
+                        });
+                        rendered = true;
+                        console.log(`Challenge cleared for band ${band} — continuing`);
+                    }
+                    catch {
+                        blocked = true;
+                    }
                 }
-                else if (/no\s*results|couldn.?t find|found 0|0 results/.test(lc)) {
-                    reason = 'empty band (0 results)';
+                else {
+                    blocked = true;
+                }
+                if (blocked) {
+                    console.log(`regular-listings not found for band ${band} — BLOCKED (challenge did not clear in ${CHALLENGE_CLEAR_TIMEOUT_MS / 1000}s); moving on.`);
+                    break;
                 }
             }
-            catch { }
-            console.log(`regular-listings not found for band ${band} [title="${title}"] — ${reason}; moving on.`);
-            break;
+            else {
+                let title = '';
+                let reason = 'no results / not loaded';
+                try {
+                    title = (await page.title().catch(() => '')) || '';
+                    const lc = (await page.content()).toLowerCase();
+                    if (/no\s*results|couldn.?t find|found 0|0 results/.test(lc)) {
+                        reason = 'empty band (0 results)';
+                    }
+                }
+                catch { }
+                console.log(`regular-listings not found for band ${band} [title="${title}"] — ${reason}; moving on.`);
+                break;
+            }
         }
         const url = new URL(mainUrl);
         // get access to URLSearchParams object
@@ -425,6 +467,7 @@ const scrapeListings = async (listings, browser) => {
     const listingsData = [];
     for (var i = 0; i < listings.length; i++) {
         const page = await browser.newPage();
+        await (0, hardenPage_1.hardenPage)(page);
         try {
             let html;
             for (let retry = 0; retry < 3; retry++) {

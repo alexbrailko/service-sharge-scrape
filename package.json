@@ -9,7 +9,9 @@
   "scripts": {
     "build": "npx tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon src/index.ts"
+    "dev": "nodemon src/index.ts",
+    "diagnose": "ts-node src/diagnoseBlock.ts",
+    "solve": "ts-node src/solveChallenge.ts"
   },
   "author": "",
   "license": "ISC",
@@ -31,9 +33,12 @@
     "puppeteer-extra-plugin-recaptcha": "^3.6.8",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "puppeteer-extra-plugin-stealth-fix": "^2.11.3",
-    "puppeteer-real-browser": "^1.4.2",
+    "puppeteer-real-browser": "^1.4.4",
     "request": "^2.88.2",
     "user-agents": "^1.1.144"
+  },
+  "overrides": {
+    "rebrowser-puppeteer-core": "^24.8.1"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

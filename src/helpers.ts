@@ -1,5 +1,15 @@
 import moment from 'moment';
+import fs from 'fs';
 import { Page } from 'puppeteer';
+
+export const ensureDir = (dirPath: string): void => {
+  if (!dirPath) return;
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch (e) {
+    console.log('ensureDir failed:', (e as Error)?.message || e);
+  }
+};
 
 export function numberWithCommas(x: number | string) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');

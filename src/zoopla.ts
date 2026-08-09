@@ -26,6 +26,7 @@ import {
   renderMapSnapshot,
   closeSharedSnapshotBrowser,
 } from './renderMapSnapshot';
+import { hardenPage } from './hardenPage';
 
 const ROTATE_BROWSER_EVERY_N_BANDS = 10;
 const MAX_CONSECUTIVE_BLOCKS = 5;
@@ -33,7 +34,37 @@ const MAX_CONSECUTIVE_EMPTY_BANDS = 6;
 const BLOCK_BACKOFF_BASE_MS = 60000;
 const BLOCK_BACKOFF_MAX_MS = 15 * 60000;
 
+const CHALLENGE_CLEAR_TIMEOUT_MS = 45000;
+const CHALLENGE_POLL_MS = 2000;
+const CHALLENGE_RETRY_SELECTOR_MS = 15000;
+
 export const BLOCK_ABORT_MESSAGE = 'consecutive Cloudflare challenges';
+
+const isChallengePage = async (page: any): Promise<boolean> => {
+  try {
+    const title = ((await page.title()) || '').toLowerCase();
+    if (
+      /just a moment|attention required|verify you are human|access denied/.test(
+        title
+      )
+    ) {
+      return true;
+    }
+    const content = (await page.content()).toLowerCase();
+    return content.includes('_cf_chl_opt');
+  } catch {
+    return false;
+  }
+};
+
+const waitForChallengeToClear = async (page: any): Promise<boolean> => {
+  const deadline = Date.now() + CHALLENGE_CLEAR_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await delay(CHALLENGE_POLL_MS);
+    if (!(await isChallengePage(page))) return true;
+  }
+  return false;
+};
 
 export type RunStats = {
   bandsScanned: number;
@@ -115,7 +146,7 @@ export const agreeOnTerms = async (page: Page) => {
 };
 export const preparePages = async (
   firstUrl: string,
-  prisma: PrismaClient,
+  prisma: PrismaClient | null,
   page: Page,
   browser: Browser,
   reconnect?: () => Promise<{ browser: any; page: any }>
@@ -267,7 +298,7 @@ export type BandOutcome = { blocked: boolean; rendered: boolean };
 
 export const scrapeEachPage = async (
   url: string,
-  prisma: PrismaClient,
+  prisma: PrismaClient | null,
   page: Page,
   browser: Browser
 ): Promise<BandOutcome> => {
@@ -321,30 +352,51 @@ export const scrapeEachPage = async (
       //   - the page was blocked (Cloudflare challenge) or failed to load -> flag it.
       const sp = new URL(mainUrl).searchParams;
       const band = `${sp.get('price_min')}-${sp.get('price_max')}`;
-      let title = '';
-      let reason = 'no results / not loaded';
-      try {
-        title = (await page.title().catch(() => '')) || '';
-        const t = title.toLowerCase();
-        const lc = (await page.content()).toLowerCase();
-        // A real Cloudflare challenge is identified by its page title and the
-        // `_cf_chl_opt` script var — body keywords alone gave false positives.
-        if (
-          /just a moment|attention required|verify you are human|access denied/.test(
-            t
-          ) ||
-          lc.includes('_cf_chl_opt')
-        ) {
+
+      if (await isChallengePage(page)) {
+        console.log(
+          `Cloudflare challenge on band ${band} — waiting up to ${
+            CHALLENGE_CLEAR_TIMEOUT_MS / 1000
+          }s for it to clear`
+        );
+
+        if (await waitForChallengeToClear(page)) {
+          try {
+            await page.waitForSelector("div[data-testid='regular-listings']", {
+              timeout: CHALLENGE_RETRY_SELECTOR_MS,
+            });
+            rendered = true;
+            console.log(`Challenge cleared for band ${band} — continuing`);
+          } catch {
+            blocked = true;
+          }
+        } else {
           blocked = true;
-          reason = 'BLOCKED (Cloudflare challenge)';
-        } else if (/no\s*results|couldn.?t find|found 0|0 results/.test(lc)) {
-          reason = 'empty band (0 results)';
         }
-      } catch {}
-      console.log(
-        `regular-listings not found for band ${band} [title="${title}"] — ${reason}; moving on.`
-      );
-      break;
+
+        if (blocked) {
+          console.log(
+            `regular-listings not found for band ${band} — BLOCKED (challenge did not clear in ${
+              CHALLENGE_CLEAR_TIMEOUT_MS / 1000
+            }s); moving on.`
+          );
+          break;
+        }
+      } else {
+        let title = '';
+        let reason = 'no results / not loaded';
+        try {
+          title = (await page.title().catch(() => '')) || '';
+          const lc = (await page.content()).toLowerCase();
+          if (/no\s*results|couldn.?t find|found 0|0 results/.test(lc)) {
+            reason = 'empty band (0 results)';
+          }
+        } catch {}
+        console.log(
+          `regular-listings not found for band ${band} [title="${title}"] — ${reason}; moving on.`
+        );
+        break;
+      }
     }
 
     const url = new URL(mainUrl);
@@ -549,6 +601,7 @@ export const scrapeListings = async (
 
   for (var i = 0; i < listings.length; i++) {
     const page = await browser.newPage();
+    await hardenPage(page);
     try {
       let html;
 
@@ -704,8 +757,22 @@ export const scrapeListings = async (
 };
 export const saveToDb = async (
   listings: ListingNoId[] = [],
-  prisma: PrismaClient
+  prisma: PrismaClient | null
 ) => {
+  if (isDev || !prisma) {
+    console.log(`[dev] would save ${listings.length} listings:`);
+    listings.forEach((l, i) => {
+      console.log(
+        `  ${i + 1}. £${l.listingPrice} | serviceCharge £${
+          l.serviceCharge
+        } | groundRent ${l.groundRent ?? '—'} | ${l.postCode || 'no postcode'} | ${
+          l.beds
+        } bed | ${l.url}`
+      );
+    });
+    return;
+  }
+
   for (var i = 0; i < listings.length; i++) {
     try {
       const savedListing = await prisma.listing.create({
@@ -750,8 +817,10 @@ export const saveImage = async (
  */
 export const checkServiceChargeHistory = async (
   listings: ListingNoId[],
-  prisma: PrismaClient
+  prisma: PrismaClient | null
 ) => {
+  if (isDev || !prisma) return listings;
+
   let filteredListings = listings;
 
   for (const listing of listings) {
@@ -800,10 +869,17 @@ export const checkServiceChargeHistory = async (
 };
 
 export const getLatestScrapedPostDate = async (
-  prisma: PrismaClient,
+  prisma: PrismaClient | null,
   priceMin: number,
   priceMax: number
 ) => {
+  if (isDev || !prisma) {
+    if (!latestPostDate) {
+      latestPostDate = moment().subtract(9999, 'd').toDate();
+    }
+    return;
+  }
+
   if (!latestPostDate) {
     const latestPost = await prisma.listing.findMany({
       where: {

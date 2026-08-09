@@ -3,8 +3,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractLatLong = exports.autoScroll = exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
+exports.extractLatLong = exports.autoScroll = exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = exports.ensureDir = void 0;
 const moment_1 = __importDefault(require("moment"));
+const fs_1 = __importDefault(require("fs"));
+const ensureDir = (dirPath) => {
+    if (!dirPath)
+        return;
+    try {
+        fs_1.default.mkdirSync(dirPath, { recursive: true });
+    }
+    catch (e) {
+        console.log('ensureDir failed:', e?.message || e);
+    }
+};
+exports.ensureDir = ensureDir;
 function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }

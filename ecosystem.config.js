@@ -25,6 +25,9 @@ module.exports = {
       max_memory_restart: '800M',
       env: {
         NODE_ENV: 'production',
+        REBROWSER_PATCHES_RUNTIME_FIX_MODE: 'addBinding',
+        REBROWSER_PATCHES_UTILITY_WORLD_NAME: 'sc_ctx',
+        REBROWSER_PATCHES_SOURCE_URL: 'main.js',
       },
     },
   ],
