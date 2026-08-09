@@ -12,6 +12,7 @@ import {
   agreeOnTerms,
   preparePages,
   readScrapedData,
+  BLOCK_ABORT_MESSAGE,
 } from './zoopla';
 import { delay } from './helpers';
 import { sendWeeklyReport, sendFailureAlert } from './report';
@@ -31,6 +32,7 @@ let retryCount = 0;
 let currentScraperBrowser: any = null;
 // Prevents runOnInit + the weekly cron + self-restart from stacking two scrapes.
 let isRunning = false;
+let isFirstRun = true;
 
 // Kill Chrome orphaned by a previous crash/restart. puppeteer-real-browser
 // launches real Chrome via chrome-launcher, whose profile dirs are /tmp/lighthouse.*.
@@ -78,6 +80,8 @@ cron.schedule(
       return;
     }
     isRunning = true;
+    const scheduled = !isFirstRun;
+    isFirstRun = false;
 
     try {
       // Clear any Chrome orphaned by a previous crash/restart before we start.
@@ -86,13 +90,19 @@ cron.schedule(
       const { page, browser } = await connectScraperBrowser();
 
       try {
-        await start(browser, page);
+        await start(browser, page, scheduled);
 
         // await page.goto(STARTING_URL, {
         //    waitUntil: ['networkidle0', 'domcontentloaded'],
         // });
       } catch (e) {
         console.error('EEE', e);
+
+        const msg = (e as Error)?.message || String(e);
+        if (msg.includes(BLOCK_ABORT_MESSAGE)) {
+          await sendFailureAlert(msg);
+        }
+
         try {
           await page.close();
         } catch (e) {
@@ -107,7 +117,7 @@ cron.schedule(
 
         await delay(10000);
         // Create a fresh connection and restart from clean state
-        await restart();
+        await restart(scheduled);
       }
     } finally {
       isRunning = false;
@@ -118,7 +128,7 @@ cron.schedule(
   }
 );
 
-const start = async (browser: any, page: any) => {
+const start = async (browser: any, page: any, scheduled = false) => {
   const prisma = await connectPrisma();
   const savedUrl = readScrapedData();
   const url = savedUrl ? savedUrl : STARTING_URL;
@@ -146,13 +156,13 @@ const start = async (browser: any, page: any) => {
   // so the runOnInit re-scrape on every PM2 restart won't spam. Never let a report
   // failure surface as a scrape failure.
   try {
-    await sendWeeklyReport();
+    await sendWeeklyReport({ scheduled });
   } catch (e) {
     console.error('Weekly report failed:', (e as Error)?.message || e);
   }
 };
 
-const restart = async () => {
+const restart = async (scheduled = false) => {
   try {
     // Consider exponential backoff for repeated retries:
     const delayMs = Math.min(2 ** retryCount * 60000, 300000); // Up to 5 minutes
@@ -161,13 +171,13 @@ const restart = async () => {
     await new Promise((resolve) => setTimeout(resolve, delayMs)); // Wait before restarting
 
     const { browser, page } = await connectScraperBrowser();
-    await start(browser, page);
+    await start(browser, page, scheduled);
   } catch (error) {
     console.error('Error during restart:', error?.message || error);
   } finally {
     retryCount++; // Increment retry count
 
-    if (retryCount === 3) {
+    if (retryCount >= 3) {
       console.log('Maximum retries reached, restarting PM2 process...');
       try {
         await sendFailureAlert(

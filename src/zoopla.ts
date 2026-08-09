@@ -28,6 +28,43 @@ import {
 } from './renderMapSnapshot';
 
 const ROTATE_BROWSER_EVERY_N_BANDS = 10;
+const MAX_CONSECUTIVE_BLOCKS = 5;
+const MAX_CONSECUTIVE_EMPTY_BANDS = 6;
+const BLOCK_BACKOFF_BASE_MS = 60000;
+const BLOCK_BACKOFF_MAX_MS = 15 * 60000;
+
+export const BLOCK_ABORT_MESSAGE = 'consecutive Cloudflare challenges';
+
+export type RunStats = {
+  bandsScanned: number;
+  bandsBlocked: number;
+  bandsEmpty: number;
+  browserRotations: number;
+  stoppedEarly: boolean;
+  aborted: boolean;
+};
+
+let runStats: RunStats = {
+  bandsScanned: 0,
+  bandsBlocked: 0,
+  bandsEmpty: 0,
+  browserRotations: 0,
+  stoppedEarly: false,
+  aborted: false,
+};
+
+export const getRunStats = (): RunStats => ({ ...runStats });
+
+export const resetRunStats = (): void => {
+  runStats = {
+    bandsScanned: 0,
+    bandsBlocked: 0,
+    bandsEmpty: 0,
+    browserRotations: 0,
+    stoppedEarly: false,
+    aborted: false,
+  };
+};
 
 var URL = require('url').URL;
 require('dotenv').config();
@@ -86,6 +123,37 @@ export const preparePages = async (
   let newUrl = firstUrl;
   let currentPage: any = page;
   let currentBrowser: any = browser;
+  let consecutiveBlocks = 0;
+  let consecutiveEmptyBands = 0;
+
+  resetRunStats();
+
+  const rotateBrowser = async (why: string): Promise<void> => {
+    if (!reconnect) return;
+    console.log(`Rotating browser (${why})`);
+    try {
+      const pages = await currentBrowser.pages();
+      await Promise.all(pages.map((p: any) => p.close().catch(() => {})));
+      await currentBrowser.close();
+    } catch (e) {
+      console.log('Error closing browser during rotation:', e);
+    }
+    try {
+      await closeSharedSnapshotBrowser();
+    } catch (e) {
+      console.log('Error closing snapshot browser during rotation:', e);
+    }
+
+    const fresh = await reconnect();
+    currentBrowser = fresh.browser;
+    currentPage = fresh.page;
+    runStats.browserRotations++;
+    try {
+      await currentPage.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+    } catch (e) {
+      console.log('Error navigating to BASE_URL after rotation:', e);
+    }
+  };
 
   for (let index = 0; index < 97; index++) {
     if (!currentBrowser.connected) {
@@ -99,28 +167,7 @@ export const preparePages = async (
       index > 0 &&
       index % ROTATE_BROWSER_EVERY_N_BANDS === 0
     ) {
-      console.log(`Rotating browser after ${index} bands`);
-      try {
-        const pages = await currentBrowser.pages();
-        await Promise.all(pages.map((p: any) => p.close().catch(() => {})));
-        await currentBrowser.close();
-      } catch (e) {
-        console.log('Error closing browser during rotation:', e);
-      }
-      try {
-        await closeSharedSnapshotBrowser();
-      } catch (e) {
-        console.log('Error closing snapshot browser during rotation:', e);
-      }
-
-      const fresh = await reconnect();
-      currentBrowser = fresh.browser;
-      currentPage = fresh.page;
-      try {
-        await currentPage.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
-      } catch (e) {
-        console.log('Error navigating to BASE_URL after rotation:', e);
-      }
+      await rotateBrowser(`after ${index} bands`);
     }
 
     const url = new URL(newUrl);
@@ -143,18 +190,68 @@ export const preparePages = async (
       );
     }
 
+    let outcome: BandOutcome = { blocked: false, rendered: false };
+    let bandErrored = false;
+
     try {
-      await scrapeEachPage(newUrl, prisma, currentPage, currentBrowser);
+      outcome = await scrapeEachPage(
+        newUrl,
+        prisma,
+        currentPage,
+        currentBrowser
+      );
     } catch (e) {
+      bandErrored = true;
       console.log(
         `Band ${priceMin}-${priceMax} failed, continuing to next band:`,
         e
       );
     }
 
-    // Stop once we reach the £10M ceiling. This was `== 10000000`, which never
-    // matched: incremented bands end in ...499999/...999999, so the scrape ran on
-    // for dozens of empty multi-million-pound bands (and hammered Cloudflare).
+    runStats.bandsScanned++;
+
+    if (outcome.blocked) {
+      consecutiveBlocks++;
+      consecutiveEmptyBands = 0;
+      runStats.bandsBlocked++;
+
+      if (consecutiveBlocks >= MAX_CONSECUTIVE_BLOCKS) {
+        runStats.aborted = true;
+        throw new Error(
+          `Aborting run after ${consecutiveBlocks} ${BLOCK_ABORT_MESSAGE} (last band ${priceMin}-${priceMax})`
+        );
+      }
+
+      const backoffMs = Math.min(
+        BLOCK_BACKOFF_BASE_MS * 2 ** (consecutiveBlocks - 1),
+        BLOCK_BACKOFF_MAX_MS
+      );
+      console.log(
+        `Cloudflare challenge ${consecutiveBlocks}/${MAX_CONSECUTIVE_BLOCKS} — backing off ${
+          backoffMs / 1000
+        }s then rotating browser`
+      );
+      await delay(backoffMs);
+      await rotateBrowser(`Cloudflare challenge on band ${priceMin}-${priceMax}`);
+    } else {
+      consecutiveBlocks = 0;
+
+      if (outcome.rendered || bandErrored) {
+        consecutiveEmptyBands = 0;
+      } else {
+        consecutiveEmptyBands++;
+        runStats.bandsEmpty++;
+
+        if (consecutiveEmptyBands >= MAX_CONSECUTIVE_EMPTY_BANDS) {
+          runStats.stoppedEarly = true;
+          console.log(
+            `Stopping after ${consecutiveEmptyBands} consecutive empty bands (last ${priceMin}-${priceMax})`
+          );
+          break;
+        }
+      }
+    }
+
     if (priceMax >= 10000000) {
       break;
     }
@@ -166,12 +263,17 @@ export const preparePages = async (
   clearScrapedDataFile();
 };
 
+export type BandOutcome = { blocked: boolean; rendered: boolean };
+
 export const scrapeEachPage = async (
   url: string,
   prisma: PrismaClient,
   page: Page,
   browser: Browser
-) => {
+): Promise<BandOutcome> => {
+  let blocked = false;
+  let rendered = false;
+
   try {
     // Set a longer timeout for navigation
     await page.setDefaultNavigationTimeout(60000);
@@ -212,6 +314,7 @@ export const scrapeEachPage = async (
       await page.waitForSelector("div[data-testid='regular-listings']", {
         timeout: 7000,
       });
+      rendered = true;
     } catch (e) {
       // The listings container didn't render in 7s. Usually one of:
       //   - the price band is genuinely empty (no results) -> expected, skip it;
@@ -232,6 +335,7 @@ export const scrapeEachPage = async (
           ) ||
           lc.includes('_cf_chl_opt')
         ) {
+          blocked = true;
           reason = 'BLOCKED (Cloudflare challenge)';
         } else if (/no\s*results|couldn.?t find|found 0|0 results/.test(lc)) {
           reason = 'empty band (0 results)';
@@ -330,6 +434,8 @@ export const scrapeEachPage = async (
       break;
     }
   }
+
+  return { blocked, rendered };
 };
 
 export const scrapeListingsList = async (page: Page) => {

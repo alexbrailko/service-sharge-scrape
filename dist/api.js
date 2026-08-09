@@ -6,10 +6,6 @@ const getAddressData = async (coordinates) => {
     if (bingResponse) {
         return bingResponse;
     }
-    const openStreetMapData = await (0, exports.getAddressDataOpenStreetMap)(coordinates);
-    if (openStreetMapData) {
-        return openStreetMapData;
-    }
     const geoapifyData = await (0, exports.getAddressDataGeoapify)(coordinates);
     return geoapifyData;
 };
@@ -67,8 +63,7 @@ const getAddressDataOpenStreetMap = async (coordinates) => {
     })
         .catch((error) => {
         console.log('Error OpenStreetMap api request:', error);
-        // Never return here, indicating an error situation
-        throw error; // Re-throw the error for potential handling elsewhere
+        return false; // Fall through to next provider in getAddressData chain
     });
     return res;
 };

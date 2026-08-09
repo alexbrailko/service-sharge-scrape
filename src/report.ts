@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { connectPrisma } from './zoopla';
+import { connectPrisma, getRunStats, RunStats } from './zoopla';
 import { sendMail } from './mailer';
 
 // Weekly scrape report. Triggered at the end of every scrape run (see index.ts),
@@ -8,7 +8,8 @@ import { sendMail } from './mailer';
 // repeatedly — at most one report per ~week.
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const THROTTLE_MS = 6 * 24 * 60 * 60 * 1000; // don't resend within 6 days
+const UNSCHEDULED_THROTTLE_MS = 6 * 24 * 60 * 60 * 1000;
+const SCHEDULED_THROTTLE_MS = 12 * 60 * 60 * 1000;
 
 const RESOURCE_LOG = process.env.RESOURCE_LOG_PATH || '/home/deploy/resource.log';
 const REPORT_TO = process.env.REPORT_TO || 'alexbrailko@gmail.com';
@@ -161,16 +162,31 @@ function buildReport(d: {
   stats: ReturnType<typeof computeStats>;
   resource: ResourceSummary | null;
   healthFlag: boolean;
+  run: RunStats;
+  blockFlag: boolean;
 }): { html: string; text: string } {
   const periodStr = `${d.since.toISOString().slice(0, 10)} → ${new Date(d.now)
     .toISOString()
     .slice(0, 10)}`;
 
-  const banner = d.healthFlag
-    ? `<div style="background:#fdecea;border:1px solid #f5c6cb;color:#a3231b;padding:12px;border-radius:6px;margin-bottom:16px;font-weight:bold;">
-         ⚠ SCRAPE LIKELY FAILED — 0 new listings added this week. Check the scraper logs.
-       </div>`
-    : '';
+  const warn = (msg: string) =>
+    `<div style="background:#fdecea;border:1px solid #f5c6cb;color:#a3231b;padding:12px;border-radius:6px;margin-bottom:16px;font-weight:bold;">${msg}</div>`;
+
+  const banner =
+    (d.healthFlag
+      ? warn(
+          '⚠ SCRAPE LIKELY FAILED — 0 new listings added this week. Check the scraper logs.'
+        )
+      : '') +
+    (d.blockFlag
+      ? warn(
+          `⚠ CLOUDFLARE BLOCKING — ${d.run.bandsBlocked} of ${
+            d.run.bandsScanned
+          } price bands were challenged${
+            d.run.aborted ? ' and the run was aborted' : ''
+          }. Listing counts below are incomplete.`
+        )
+      : '');
 
   const cell = 'padding:6px 10px;border-bottom:1px solid #eee;';
   const th = 'padding:6px 10px;text-align:left;border-bottom:2px solid #ddd;background:#f7f7f7;';
@@ -208,6 +224,16 @@ function buildReport(d: {
       <tr><td style="${cell}">Top postcode areas</td><td style="${cell}">${areaRows}</td></tr>
       <tr><td style="${cell}">Price bands</td><td style="${cell}">${escapeHtml(bandRows)}</td></tr>
       ${resourceHtml}
+      <tr><td style="${cell}">Scrape coverage</td><td style="${cell}">
+        ${d.run.bandsScanned} bands scanned ·
+        <b style="color:${d.run.bandsBlocked ? '#a3231b' : '#1a7f37'}">${
+          d.run.bandsBlocked
+        } blocked</b> ·
+        ${d.run.bandsEmpty} empty ·
+        ${d.run.browserRotations} browser rotations${
+          d.run.stoppedEarly ? ' · stopped early (empty bands)' : ''
+        }${d.run.aborted ? ' · <b>run aborted</b>' : ''}
+      </td></tr>
     </table>
     <p style="color:#999;font-size:12px;margin-top:16px;">Sent automatically by the Zoopla scraper at end of run.</p>
   </div>`;
@@ -215,6 +241,11 @@ function buildReport(d: {
   const text = [
     `Weekly scrape report  (${periodStr})`,
     d.healthFlag ? '** SCRAPE LIKELY FAILED — 0 new listings this week **' : '',
+    d.blockFlag
+      ? `** CLOUDFLARE BLOCKING — ${d.run.bandsBlocked}/${d.run.bandsScanned} bands challenged${
+          d.run.aborted ? ', run aborted' : ''
+        } **`
+      : '',
     ``,
     `New listings this week: ${d.newCount}`,
     `Total listings in DB:   ${d.totalListings}`,
@@ -234,12 +265,23 @@ function buildReport(d: {
 
 // ---------- public API ----------
 
-export async function sendWeeklyReport(opts?: { force?: boolean }): Promise<void> {
+export async function sendWeeklyReport(opts?: {
+  force?: boolean;
+  scheduled?: boolean;
+}): Promise<void> {
   const now = Date.now();
   const lastSent = readLastSent();
-  if (!opts?.force && now - lastSent < THROTTLE_MS) {
+  const throttleMs = opts?.scheduled
+    ? SCHEDULED_THROTTLE_MS
+    : UNSCHEDULED_THROTTLE_MS;
+
+  if (!opts?.force && now - lastSent < throttleMs) {
     const days = ((now - lastSent) / 86400000).toFixed(1);
-    console.log(`Weekly report skipped — last sent ${days}d ago (throttled).`);
+    console.log(
+      `Weekly report skipped — last sent ${days}d ago (throttled, ${
+        opts?.scheduled ? 'scheduled' : 'unscheduled'
+      } run).`
+    );
     return;
   }
 
@@ -271,10 +313,14 @@ export async function sendWeeklyReport(opts?: { force?: boolean }): Promise<void
 
     const stats = computeStats(rows);
     const resource = summarizeResourceLog(RESOURCE_LOG, since);
+    const run = getRunStats();
     const healthFlag = newCount === 0;
+    const blockFlag = run.bandsBlocked > 0;
 
     const subject = healthFlag
       ? '[ACTION] Weekly scrape report — 0 new listings'
+      : blockFlag
+      ? `[ACTION] Weekly scrape report — ${newCount} new listings, ${run.bandsBlocked} bands blocked`
       : `Weekly scrape report — ${newCount} new listings`;
 
     const { html, text } = buildReport({
@@ -288,6 +334,8 @@ export async function sendWeeklyReport(opts?: { force?: boolean }): Promise<void
       stats,
       resource,
       healthFlag,
+      run,
+      blockFlag,
     });
 
     await sendMail({ to: REPORT_TO, subject, html, text });

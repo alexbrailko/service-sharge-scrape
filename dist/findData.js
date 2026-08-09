@@ -4,8 +4,9 @@ exports.findServiceCharge = exports.findGroundRent = exports.findArea = exports.
 const helpers_1 = require("./helpers");
 const findCoordinates = async ($, page) => {
     const src = $('section[aria-labelledby="local-area"] picture source').attr('srcset');
-    const coordinates = (0, helpers_1.extractLatLong)(src); //51.544505,-0.110049
-    return coordinates;
+    // src is undefined when the listing has no local-area map; extractLatLong
+    // handles the empty/undefined case and returns null without logging an error.
+    return (0, helpers_1.extractLatLong)(src); //51.544505,-0.110049
 };
 exports.findCoordinates = findCoordinates;
 const findArea = ($) => {
@@ -42,16 +43,16 @@ const findGroundRent = ($) => {
         .find('li')
         .filter((i, el) => $(el).text().toLowerCase().includes(text));
     const groundRentText = $(groundRentElem).find(' > div p').text();
-    if (!groundRentText || groundRentText === 'Not available') {
-        // search in features section
-        if ($("div[data-testid='listing_features']")) {
-            const filteredElement = (0, helpers_1.findMatchedElement)($, "ul[data-testid='listing_features_bulletted'] li", text);
-            if (filteredElement.length) {
-                return (0, helpers_1.extractNumberFromText)($(filteredElement), text);
-            }
+    if (!groundRentText ||
+        groundRentText === 'Not available' ||
+        groundRentText === 'Ask agent') {
+        // search in the "About this property" feature bullets
+        const featureMatch = (0, helpers_1.findMatchedElement)($, 'section[aria-labelledby="about"] li', text);
+        if (featureMatch.length) {
+            return (0, helpers_1.extractNumberFromText)($(featureMatch), text);
         }
-        // search in description
-        const filteredElement = (0, helpers_1.findMatchedElement)($, "div[data-testid='truncated_text_container']", text);
+        // search in the description text
+        const filteredElement = (0, helpers_1.findMatchedElement)($, '#detailed-desc', text);
         if (filteredElement.length) {
             return (0, helpers_1.extractNumberFromText)($(filteredElement), text);
         }
@@ -71,24 +72,23 @@ const findServiceCharge = ($) => {
         .filter((i, el) => $(el).text().toLowerCase().includes(text));
     const serviceChargeText = $(serviceChargeElem).find(' > div p').text();
     let serviceChargeAmount = null;
-    if (serviceChargeText.includes('month')) {
-        serviceChargeAmount = (0, helpers_1.extractNumberFromString)(serviceChargeText) * 12;
+    const extractedNumber = (0, helpers_1.extractNumberFromString)(serviceChargeText);
+    if (serviceChargeText.includes('month') && extractedNumber !== null) {
+        serviceChargeAmount = extractedNumber * 12;
     }
     else {
-        serviceChargeAmount = (0, helpers_1.extractNumberFromString)(serviceChargeText);
+        serviceChargeAmount = extractedNumber;
     }
     if (!serviceChargeAmount ||
         serviceChargeText === 'Not available' ||
         serviceChargeText === 'Ask agent') {
-        // search in features section
-        if ($("div[data-testid='listing_features']")) {
-            const filteredElement = (0, helpers_1.findMatchedElement)($, "ul[data-testid='listing_features_bulletted'] li", text);
-            if (filteredElement.length) {
-                return (0, helpers_1.extractNumberFromText)($(filteredElement), text);
-            }
+        // search in the "About this property" feature bullets
+        const featureMatch = (0, helpers_1.findMatchedElement)($, 'section[aria-labelledby="about"] li', text);
+        if (featureMatch.length) {
+            return (0, helpers_1.extractNumberFromText)($(featureMatch), text);
         }
-        // search in description
-        const filteredElement = (0, helpers_1.findMatchedElement)($, "div[data-testid='truncated_text_container']", text);
+        // search in the description text
+        const filteredElement = (0, helpers_1.findMatchedElement)($, '#detailed-desc', text);
         if (filteredElement.length) {
             return (0, helpers_1.extractNumberFromText)($(filteredElement), text);
         }

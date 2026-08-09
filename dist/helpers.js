@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractLatLong = exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
+exports.extractLatLong = exports.autoScroll = exports.navigateWithRetry = exports.isNMonthsApart = exports.numberDifferencePercentage = exports.delay = exports.extractNumberFromText = exports.incrementPrice = exports.updateURLParameter = exports.moreThanXHoursAgo = exports.isBeforeToday = exports.findMatchedElement = exports.extractNumberFromString = exports.numberWithCommas = void 0;
 const moment_1 = __importDefault(require("moment"));
 function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -89,6 +89,8 @@ const extractNumberFromText = (el, str) => {
     }
     const newText = cutText.substring(index).substr(0, 30);
     const extractNumber = extractNumberFromString(newText);
+    if (extractNumber === null)
+        return null;
     if (newText.includes('pm') ||
         newText.includes('month') ||
         newText.includes('pcm')) {
@@ -155,19 +157,62 @@ async function navigateWithRetry(page, url, errMsg) {
     console.error(`Error: Navigation failed for ${url} after ${MAX_RETRIES} retries`);
 }
 exports.navigateWithRetry = navigateWithRetry;
-const extractLatLong = (url) => {
+// Listing detail pages lazy-load below-the-fold widgets (the 'Local area' map,
+// points of interest, etc.) only once scrolled into view. Scroll through the
+// page so those sections render into the DOM before we snapshot page.content().
+async function autoScroll(page) {
     try {
+        await page.evaluate(async () => {
+            await new Promise((resolve) => {
+                let total = 0;
+                let ticks = 0;
+                const step = 600;
+                const timer = setInterval(() => {
+                    window.scrollBy(0, step);
+                    total += step;
+                    ticks += 1;
+                    // stop at the bottom, or after a hard cap (~9s) so we never hang
+                    if (total >= document.body.scrollHeight - window.innerHeight ||
+                        ticks > 60) {
+                        clearInterval(timer);
+                        resolve();
+                    }
+                }, 150);
+            });
+        });
+    }
+    catch (e) {
+        // non-fatal — proceed with whatever rendered
+    }
+}
+exports.autoScroll = autoScroll;
+const extractLatLong = (srcset) => {
+    if (!srcset)
+        return null; // no local-area map on this listing — not an error
+    try {
+        // `srcset` may carry an image descriptor or several candidates
+        // ("url 2x" or "url1 1x, url2 2x"). The map URL itself contains commas
+        // (lon,lat,zoom), so split on whitespace and take the first URL token.
+        let url = srcset.trim().split(/\s+/)[0];
+        if (!url)
+            return null;
+        if (url.startsWith('//'))
+            url = 'https:' + url; // protocol-relative URL
         const parsedUrl = new URL(url);
-        const pathSegments = parsedUrl.pathname.split('/');
-        const coordSegment = pathSegments[4]; // e.g., '0.023261,51.407275,13'
+        const coordSegment = parsedUrl.pathname.split('/')[4]; // e.g. '0.023261,51.407275,13'
+        if (!coordSegment)
+            return null;
         const [longitudeStr, latitudeStr] = coordSegment.split(',');
-        if (!latitudeStr || !longitudeStr) {
-            throw new Error('Invalid coordinate format in URL.');
+        if (!latitudeStr ||
+            !longitudeStr ||
+            isNaN(parseFloat(latitudeStr)) ||
+            isNaN(parseFloat(longitudeStr))) {
+            return null;
         }
         return `${latitudeStr},${longitudeStr}`;
     }
     catch (error) {
-        console.error('Error extracting coordinates:', error.message);
+        console.error('Error extracting coordinates:', error instanceof Error ? error.message : error);
         return null;
     }
 };
