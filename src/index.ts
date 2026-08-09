@@ -41,7 +41,7 @@ let isFirstRun = true;
 const killStrayChrome = async () => {
   if (process.platform !== 'linux') return;
   try {
-    await execAsync("pkill -f 'user-data-dir=/tmp/lighthouse' || true");
+    await execAsync("pkill -f '[u]ser-data-dir=/tmp/lighthouse' || true");
     await execAsync('rm -rf /tmp/lighthouse.* || true');
   } catch (e) {
     console.log('killStrayChrome (non-fatal):', (e as Error)?.message || e);
@@ -56,7 +56,6 @@ const connectScraperBrowser = async () => {
       '--disable-setuid-sandbox',
       '--disable-blink-features=AutomationControlled',
       '--disable-features=IsolateOrigins,site-per-process',
-      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
     ],
     customConfig: !isDev
       ? { chromePath: '/usr/bin/chromium-browser' }
