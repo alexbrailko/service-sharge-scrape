@@ -11,6 +11,7 @@ import {
   delay,
   isNMonthsApart,
   autoScroll,
+  normalizeListingUrl,
 } from './helpers';
 import { ListingMainPage, ListingNoId } from './types';
 import fs from 'fs';
@@ -31,6 +32,10 @@ import { hardenPage } from './hardenPage';
 const ROTATE_BROWSER_EVERY_N_BANDS = 10;
 const MAX_CONSECUTIVE_BLOCKS = 5;
 const MAX_CONSECUTIVE_EMPTY_BANDS = 6;
+const RESCRAPE_AFTER_DAYS = parseInt(
+  process.env.RESCRAPE_AFTER_DAYS || '85',
+  10
+);
 const BLOCK_BACKOFF_BASE_MS = 60000;
 const BLOCK_BACKOFF_MAX_MS = 15 * 60000;
 
@@ -419,13 +424,17 @@ export const scrapeEachPage = async (
       break;
     }
 
+    const toScrape = await filterAlreadyScraped(listingsList, prisma);
+
     let listings: ListingNoId[] = [];
 
-    try {
-      listings = await scrapeListings(listingsList, browser);
-    } catch (e) {
-      console.log('scrapeListings batch failed, continuing pagination:', e);
-      listings = [];
+    if (toScrape.length) {
+      try {
+        listings = await scrapeListings(toScrape, browser);
+      } catch (e) {
+        console.log('scrapeListings batch failed, continuing pagination:', e);
+        listings = [];
+      }
     }
 
     listingsData.push.apply(listingsData, listings);
@@ -561,7 +570,7 @@ export const scrapeListingsList = async (page: Page) => {
       //  moment(datePosted) > moment(latestPostDate)
       // ) {
       return {
-        url: BASE_URL + url,
+        url: normalizeListingUrl(BASE_URL + url),
         datePosted,
         listingPrice,
       };
@@ -585,6 +594,52 @@ export const scrapeListingsList = async (page: Page) => {
   } else {
     return listings;
   }
+};
+
+export const filterAlreadyScraped = async (
+  listings: ListingMainPage[],
+  prisma: PrismaClient | null
+): Promise<ListingMainPage[]> => {
+  const byUrl = new Map<string, ListingMainPage>();
+  for (const listing of listings) {
+    if (listing && listing.url && !byUrl.has(listing.url)) {
+      byUrl.set(listing.url, listing);
+    }
+  }
+  const unique = Array.from(byUrl.values());
+  const inBatchDupes = listings.length - unique.length;
+
+  if (isDev || !prisma || !unique.length) {
+    if (inBatchDupes) {
+      console.log(`dropped ${inBatchDupes} in-batch duplicate urls`);
+    }
+    return unique;
+  }
+
+  const cutoff = new Date(Date.now() - RESCRAPE_AFTER_DAYS * 86400000);
+
+  const existing = await prisma.listing.findMany({
+    where: {
+      OR: unique.map((l) => ({ url: { startsWith: l.url } })),
+      scrapedAt: { gte: cutoff },
+    },
+    select: { url: true },
+  });
+
+  const seen = new Set(existing.map((e) => normalizeListingUrl(e.url)));
+  const fresh = unique.filter((l) => !seen.has(l.url));
+  const alreadyHave = unique.length - fresh.length;
+
+  if (inBatchDupes || alreadyHave) {
+    console.log(
+      `skipping ${alreadyHave} already scraped within ${RESCRAPE_AFTER_DAYS}d` +
+        `${inBatchDupes ? ` + ${inBatchDupes} in-batch dupes` : ''}; ${
+          fresh.length
+        } left to scrape`
+    );
+  }
+
+  return fresh;
 };
 
 type InFlightListing = Omit<ListingNoId, 'serviceCharge'> & {
@@ -790,6 +845,10 @@ export const saveToDb = async (
         process.env.IMAGES_PATH
       );
     } catch (e) {
+      if ((e as any)?.code === 'P2002') {
+        console.log(`duplicate blocked by unique index: ${listings[i].url}`);
+        continue;
+      }
       console.log('Error saving to db', e);
       continue;
     }
@@ -821,51 +880,42 @@ export const checkServiceChargeHistory = async (
 ) => {
   if (isDev || !prisma) return listings;
 
-  let filteredListings = listings;
+  const kept: ListingNoId[] = [];
 
   for (const listing of listings) {
-    const latestListings = await prisma.listing.findMany({
-      where: {
-        addressFull: {
-          equals: listing.addressFull,
-        },
-        beds: {
-          equals: listing.beds,
-        },
-      },
-      orderBy: {
-        datePosted: 'desc',
-      },
+    const [latestListing] = await prisma.listing.findMany({
+      where: { url: { startsWith: listing.url } },
+      orderBy: { scrapedAt: 'desc' },
       take: 1,
     });
 
-    const latestListing = latestListings.length ? latestListings[0] : null;
-
     if (!latestListing) {
+      kept.push(listing);
       continue;
     }
 
-    const noScPriceDiff = !numberDifferencePercentage(
+    const chargeChanged = numberDifferencePercentage(
       listing.serviceCharge,
       latestListing.serviceCharge,
       5
     );
 
-    const isLessThanThreeMonthApart = !isNMonthsApart(
+    const enoughTimePassed = isNMonthsApart(
       listing.datePosted,
       latestListing.datePosted,
       3
     );
 
-    if ((latestListing && noScPriceDiff) || isLessThanThreeMonthApart) {
-      // remove irrelevant listing
-      filteredListings = filteredListings.filter(
-        (l) => l.addressFull !== latestListing.addressFull
+    if (chargeChanged && enoughTimePassed) {
+      kept.push(listing);
+    } else {
+      console.log(
+        `skipped existing listing (chargeChanged=${chargeChanged}, enoughTimePassed=${enoughTimePassed}): ${listing.url}`
       );
     }
   }
 
-  return filteredListings;
+  return kept;
 };
 
 export const getLatestScrapedPostDate = async (

@@ -2,6 +2,16 @@ import moment from 'moment';
 import fs from 'fs';
 import { Page } from 'puppeteer';
 
+export const normalizeListingUrl = (rawUrl: string): string => {
+  if (!rawUrl) return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return rawUrl.split('?')[0].split('#')[0];
+  }
+};
+
 export const ensureDir = (dirPath: string): void => {
   if (!dirPath) return;
   try {

@@ -12,7 +12,8 @@
     "dev": "nodemon src/index.ts",
     "diagnose": "ts-node src/diagnoseBlock.ts",
     "solve": "ts-node src/solveChallenge.ts",
-    "check-duplicates": "ts-node src/checkDuplicates.ts"
+    "check-duplicates": "ts-node src/checkDuplicates.ts",
+    "dedupe": "ts-node src/dedupeExisting.ts"
   },
   "author": "",
   "license": "ISC",
