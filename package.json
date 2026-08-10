@@ -11,7 +11,8 @@
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
     "diagnose": "ts-node src/diagnoseBlock.ts",
-    "solve": "ts-node src/solveChallenge.ts"
+    "solve": "ts-node src/solveChallenge.ts",
+    "check-duplicates": "ts-node src/checkDuplicates.ts"
   },
   "author": "",
   "license": "ISC",
