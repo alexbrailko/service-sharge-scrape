@@ -83,6 +83,36 @@ const run = async () => {
     `\n--- urls seen both before and inside the window (re-inserted) ---\n  ${reScraped[0].c}`
   );
 
+  const reScrapedRows = fmt(
+    await prisma.$queryRaw`
+      SELECT url, id, serviceCharge, groundRent, beds, addressFull,
+             datePosted, scrapedAt
+      FROM \`Listing\`
+      WHERE url IN (
+        SELECT url FROM \`Listing\`
+        GROUP BY url
+        HAVING SUM(scrapedAt >= ${since}) > 0 AND SUM(scrapedAt < ${since}) > 0
+      )
+      ORDER BY url, scrapedAt`
+  );
+
+  if (reScrapedRows.length) {
+    console.log('\n--- detail for re-inserted urls ---');
+    let currentUrl = '';
+    for (const r of reScrapedRows) {
+      if (String(r.url) !== currentUrl) {
+        currentUrl = String(r.url);
+        console.log(`\n  ${currentUrl}`);
+      }
+      console.log(
+        `    scrapedAt=${r.scrapedAt} datePosted=${r.datePosted} sc=£${r.serviceCharge} gr=${
+          r.groundRent ?? '—'
+        } beds=${r.beds} addr="${r.addressFull}"`
+      );
+    }
+    console.log('');
+  }
+
   const dupAddress = fmt(
     await prisma.$queryRaw`
       SELECT addressFull, beds, COUNT(*) AS c,
