@@ -47,6 +47,46 @@ const run = async () => {
   console.log('--- duplicate urls (all time) ---');
   console.log(`  groups: ${dupUrlsAll[0].dupGroups}  extra rows: ${dupUrlsAll[0].extraRows || 0}`);
 
+  const breakdown = fmt(
+    await prisma.$queryRaw`
+      SELECT
+        SUM(dc = 1) AS sameChargeGroups,
+        SUM(dc > 1) AS variedChargeGroups,
+        SUM(CASE WHEN dc = 1 THEN c - 1 ELSE 0 END) AS sameChargeExtraRows,
+        SUM(CASE WHEN dc > 1 THEN c - 1 ELSE 0 END) AS variedChargeExtraRows
+      FROM (
+        SELECT url, COUNT(*) AS c, COUNT(DISTINCT serviceCharge) AS dc
+        FROM \`Listing\` GROUP BY url HAVING c > 1
+      ) t`
+  );
+  const b = breakdown[0];
+  console.log('\n--- duplicate url breakdown ---');
+  console.log(
+    `  identical serviceCharge: ${b.sameChargeGroups} groups, ${b.sameChargeExtraRows} extra rows  (likely junk)`
+  );
+  console.log(
+    `  differing serviceCharge: ${b.variedChargeGroups} groups, ${b.variedChargeExtraRows} extra rows  (likely intentional history)`
+  );
+
+  const tightGaps = fmt(
+    await prisma.$queryRaw`
+      SELECT url, COUNT(*) AS c,
+             DATEDIFF(MAX(scrapedAt), MIN(scrapedAt)) AS gapDays,
+             MIN(serviceCharge) AS sc
+      FROM \`Listing\`
+      GROUP BY url
+      HAVING c > 1 AND COUNT(DISTINCT serviceCharge) = 1
+      ORDER BY gapDays ASC LIMIT 10`
+  );
+  console.log('\n--- same charge, smallest time gap (worst duplicates) ---');
+  if (!tightGaps.length) {
+    console.log('  none');
+  } else {
+    tightGaps.forEach((r) =>
+      console.log(`  ${r.c}x  gap=${r.gapDays}d  sc=£${r.sc}  ${r.url}`)
+    );
+  }
+
   const topDupUrls = fmt(
     await prisma.$queryRaw`
       SELECT url, COUNT(*) AS c,
