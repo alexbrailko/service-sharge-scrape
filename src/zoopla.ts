@@ -26,10 +26,14 @@ import {
 import {
   renderMapSnapshot,
   closeSharedSnapshotBrowser,
+  getSharedSnapshotBrowser,
 } from './renderMapSnapshot';
 import { hardenPage } from './hardenPage';
 
 const ROTATE_BROWSER_EVERY_N_BANDS = 10;
+
+const MAIN_BROWSER_RSS_LIMIT_KB = 2 * 1024 * 1024; // 2 GB
+const SNAPSHOT_BROWSER_RSS_LIMIT_KB = 768 * 1024; // 768 MB
 const MAX_CONSECUTIVE_BLOCKS = 5;
 const MAX_CONSECUTIVE_EMPTY_BANDS = 6;
 const RESCRAPE_AFTER_DAYS = parseInt(
@@ -44,6 +48,46 @@ const CHALLENGE_POLL_MS = 2000;
 const CHALLENGE_RETRY_SELECTOR_MS = 15000;
 
 export const BLOCK_ABORT_MESSAGE = 'consecutive Cloudflare challenges';
+
+// Sum the resident memory of a browser process and all its descendants.
+// Reads /proc directly, so this is Linux-only (the server); returns 0 on
+// any other platform or on error, which just skips the RSS-cap rotation.
+const getBrowserTreeRssKb = async (browser: any): Promise<number> => {
+  const rootPid = browser?.process?.()?.pid;
+  if (!rootPid) return 0;
+  try {
+    const pids = fs.readdirSync('/proc').filter((p) => /^\d+$/.test(p));
+    const ppid = new Map<number, number>();
+    const rssKb = new Map<number, number>();
+    for (const pid of pids) {
+      try {
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+
+        const rest = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+        ppid.set(Number(pid), Number(rest[1]));
+        rssKb.set(Number(pid), Number(rest[21]) * 4);
+      } catch {
+        // process vanished mid-scan; ignore
+      }
+    }
+    const descendants = new Set<number>([rootPid]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const [pid, parent] of ppid) {
+        if (descendants.has(parent) && !descendants.has(pid)) {
+          descendants.add(pid);
+          grew = true;
+        }
+      }
+    }
+    let total = 0;
+    for (const pid of descendants) total += rssKb.get(pid) || 0;
+    return total;
+  } catch {
+    return 0;
+  }
+};
 
 const isChallengePage = async (page: any): Promise<boolean> => {
   try {
@@ -198,12 +242,34 @@ export const preparePages = async (
       );
     }
 
-    if (
-      reconnect &&
-      index > 0 &&
-      index % ROTATE_BROWSER_EVERY_N_BANDS === 0
-    ) {
-      await rotateBrowser(`after ${index} bands`);
+    if (reconnect && index > 0) {
+      if (index % ROTATE_BROWSER_EVERY_N_BANDS === 0) {
+        await rotateBrowser(`after ${index} bands`);
+      } else {
+        const mainRssKb = await getBrowserTreeRssKb(currentBrowser);
+        if (mainRssKb > MAIN_BROWSER_RSS_LIMIT_KB) {
+          await rotateBrowser(
+            `main browser RSS ${(mainRssKb / 1024 / 1024).toFixed(
+              1
+            )} GB exceeds cap`
+          );
+        } else {
+          const snapshotBrowser = getSharedSnapshotBrowser();
+          const snapshotRssKb = snapshotBrowser
+            ? await getBrowserTreeRssKb(snapshotBrowser)
+            : 0;
+          if (snapshotRssKb > SNAPSHOT_BROWSER_RSS_LIMIT_KB) {
+            console.log(
+              `Closing snapshot browser: RSS ${(
+                snapshotRssKb /
+                1024 /
+                1024
+              ).toFixed(1)} GB exceeds cap (relaunches on demand)`
+            );
+            await closeSharedSnapshotBrowser();
+          }
+        }
+      }
     }
 
     const url = new URL(newUrl);
@@ -268,7 +334,9 @@ export const preparePages = async (
         }s then rotating browser`
       );
       await delay(backoffMs);
-      await rotateBrowser(`Cloudflare challenge on band ${priceMin}-${priceMax}`);
+      await rotateBrowser(
+        `Cloudflare challenge on band ${priceMin}-${priceMax}`
+      );
     } else {
       consecutiveBlocks = 0;
 
@@ -479,8 +547,8 @@ export const scrapeEachPage = async (
           el.textContent?.includes('Next')
         );
       });
-      const isLastPage = await (nextLink as any).evaluate((el: any) =>
-        el?.getAttribute('aria-disabled') === 'true'
+      const isLastPage = await (nextLink as any).evaluate(
+        (el: any) => el?.getAttribute('aria-disabled') === 'true'
       );
 
       if (isLastPage) {
