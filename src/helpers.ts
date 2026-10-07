@@ -21,8 +21,6 @@ export const ensureDir = (dirPath: string): void => {
   }
 };
 
-huj
-
 export function numberWithCommas(x: number | string) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }

@@ -12,7 +12,9 @@ const UNSCHEDULED_THROTTLE_MS = 6 * 24 * 60 * 60 * 1000;
 const SCHEDULED_THROTTLE_MS = 12 * 60 * 60 * 1000;
 
 const RESOURCE_LOG = process.env.RESOURCE_LOG_PATH || '/home/deploy/resource.log';
-const REPORT_TO = process.env.REPORT_TO || 'alexbrailko@gmail.com';
+// Comma-separated list of report recipients (nodemailer accepts this natively).
+const REPORT_TO =
+  process.env.REPORT_TO || 'alexbrailko@gmail.com,info@service-charge.co.uk';
 // dist/report.js -> project root, writable by the deploy user.
 const STATE_FILE = path.join(__dirname, '..', 'report-state.json');
 
